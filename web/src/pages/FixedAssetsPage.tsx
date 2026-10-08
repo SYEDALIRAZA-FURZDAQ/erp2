@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, post } from '../lib/api';
+import { useTranslation } from '../lib/i18n';
 import { ErrorBox, Modal, PageHeader, StatCard, StatusBadge, SuccessBox } from '../components/ui';
 
 interface FixedAsset {
@@ -19,6 +20,7 @@ interface FixedAsset {
 }
 
 export default function FixedAssetsPage() {
+  const { t } = useTranslation();
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,11 +84,11 @@ export default function FixedAssetsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Fixed Assets & Depreciation"
-        subtitle="Asset register, straight-line depreciation engine, and automatic ledger posting"
+        title={t('assets.title', 'Fixed Assets & Depreciation')}
+        subtitle={t('assets.subtitle', 'Asset register, straight-line depreciation engine, and automatic ledger posting')}
       >
         <button className="btn" onClick={() => setShowAddModal(true)}>
-          + Add Fixed Asset
+          {t('assets.add', '+ Add Fixed Asset')}
         </button>
       </PageHeader>
 
@@ -96,20 +98,20 @@ export default function FixedAssetsPage() {
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          title="Total Assets Cost"
+          title={t('assets.total_cost', 'Total Assets Cost')}
           value={`PKR ${totalCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
           icon="🏢"
         />
         <StatCard
-          title="Accumulated Depreciation"
+          title={t('assets.accumulated_depreciation', 'Accumulated Depreciation')}
           value={`PKR ${totalDepreciation.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
           icon="📉"
         />
         <StatCard
-          title="Current Net Book Value"
+          title={t('assets.book_value', 'Current Net Book Value')}
           value={`PKR ${totalBookValue.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
           icon="💼"
-          badge="Net Asset Worth"
+          badge={t('assets.net_worth', 'Net Asset Worth')}
         />
       </div>
 
@@ -118,15 +120,15 @@ export default function FixedAssetsPage() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="th">Asset Code</th>
-              <th className="th">Asset Name</th>
-              <th className="th">Category</th>
-              <th className="th">Purchase Date</th>
-              <th className="th text-right">Cost (PKR)</th>
-              <th className="th text-right">Depreciation</th>
-              <th className="th text-right">Book Value</th>
-              <th className="th text-center">Status</th>
-              <th className="th text-right">Actions</th>
+              <th className="th">{t('assets.asset_code', 'Asset Code')}</th>
+              <th className="th">{t('assets.asset_name', 'Asset Name')}</th>
+              <th className="th">{t('assets.category', 'Category')}</th>
+              <th className="th">{t('common.date', 'Purchase Date')}</th>
+              <th className="th text-right">{t('assets.cost', 'Cost (PKR)')}</th>
+              <th className="th text-right">{t('assets.depreciation_col', 'Depreciation')}</th>
+              <th className="th text-right">{t('assets.book_value_col', 'Book Value')}</th>
+              <th className="th text-center">{t('common.status', 'Status')}</th>
+              <th className="th text-right">{t('common.actions', 'Actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -156,7 +158,7 @@ export default function FixedAssetsPage() {
                     className="btn bg-indigo-600 hover:bg-indigo-700 text-xs py-1 px-2.5"
                     onClick={() => handleRunDepreciation(a.id)}
                   >
-                    Run Depreciation
+                    {t('assets.run_depreciation', 'Run Depreciation')}
                   </button>
                 </td>
               </tr>
@@ -164,7 +166,7 @@ export default function FixedAssetsPage() {
             {assets.length === 0 && !loading && (
               <tr>
                 <td colSpan={9} className="p-8 text-center text-slate-500">
-                  No fixed assets registered yet. Add your first asset.
+                  {t('common.no_records', 'No fixed assets registered yet. Add your first asset.')}
                 </td>
               </tr>
             )}
@@ -174,7 +176,7 @@ export default function FixedAssetsPage() {
 
       {/* MODAL: Add Fixed Asset */}
       {showAddModal && (
-        <Modal title="Add Fixed Asset" maxWidth="max-w-2xl" onClose={() => setShowAddModal(false)}>
+        <Modal title={t('assets.add_modal_title', 'Add Fixed Asset')} maxWidth="max-w-2xl" onClose={() => setShowAddModal(false)}>
           <form onSubmit={handleCreateAsset} className="space-y-4">
             <div>
               <label className="label">Asset Name / Description</label>

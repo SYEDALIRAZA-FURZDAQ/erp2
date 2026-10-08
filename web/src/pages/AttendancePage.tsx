@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, errorText, patch, post } from '../lib/api';
+import { useTranslation } from '../lib/i18n';
 import { EmptyState, ErrorBox, Modal, PageHeader, StatCard, StatusBadge, SuccessBox } from '../components/ui';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -340,6 +341,7 @@ function MonthCalendar({
 type Tab = 'sheet' | 'calendar' | 'leaves';
 
 export default function AttendancePage() {
+  const { t } = useTranslation();
   const { data: company } = useQuery({ queryKey: ['company'], queryFn: () => api<any>('/company') });
   const [tab, setTab] = useState<Tab>('sheet');
   const [selectedDate, setSelectedDate] = useState(TODAY);
@@ -495,10 +497,10 @@ export default function AttendancePage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Attendance & Leave Management"
-        subtitle="Track daily check-ins, mark attendance, view calendars and manage leave approvals"
+        title={t('attendance.title', 'Attendance & Leave Management')}
+        subtitle={t('attendance.subtitle', 'Track daily check-ins, mark attendance, view calendars and manage leave approvals')}
       >
-        <button className="btn" onClick={() => setShowLeaveModal(true)}>+ Apply Leave</button>
+        <button className="btn" onClick={() => setShowLeaveModal(true)}>{t('attendance.apply_leave', '+ Apply Leave')}</button>
       </PageHeader>
 
       <ErrorBox message={error} />
@@ -507,17 +509,21 @@ export default function AttendancePage() {
       {/* KPI Cards */}
       {summary && (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard title="Total Staff"    value={summary.totalEmployees} icon="👥" />
-          <StatCard title="Present Today"  value={summary.present}        icon="✅" badge="On duty" />
-          <StatCard title="Late"           value={summary.late}           icon="⏰" />
-          <StatCard title="Absent"         value={summary.absent}         icon="❌" />
-          <StatCard title="On Leave"       value={summary.on_leave}       icon="🏖️" />
+          <StatCard title={t('attendance.total_staff', 'Total Staff')}    value={summary.totalEmployees} icon="👥" />
+          <StatCard title={t('attendance.present_today', 'Present Today')}  value={summary.present}        icon="✅" badge="On duty" />
+          <StatCard title={t('status.late', 'Late')}           value={summary.late}           icon="⏰" />
+          <StatCard title={t('status.absent', 'Absent')}         value={summary.absent}         icon="❌" />
+          <StatCard title={t('attendance.on_leave', 'On Leave')}       value={summary.on_leave}       icon="🏖️" />
         </div>
       )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto">
-        {([ ['sheet', '📋 Daily Sheet'], ['calendar', '📅 Calendar View'], ['leaves', '🏖️ Leave Approvals'] ] as [Tab, string][]).map(([key, label]) => (
+        {([
+          ['sheet', t('attendance.sheet', '📋 Daily Sheet')],
+          ['calendar', t('attendance.calendar', '📅 Calendar View')],
+          ['leaves', t('attendance.leaves', '🏖️ Leave Approvals')]
+        ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
             className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
@@ -548,7 +554,7 @@ export default function AttendancePage() {
               />
               {!isToday && (
                 <button className="btn-ghost text-xs py-1 px-2.5" onClick={() => setSelectedDate(TODAY)}>
-                  Jump to Today
+                  {t('attendance.jump_today', 'Jump to Today')}
                 </button>
               )}
             </div>
@@ -570,13 +576,13 @@ export default function AttendancePage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      <th className="th rounded-tl-xl">Code</th>
-                      <th className="th">Employee</th>
-                      <th className="th">Dept.</th>
-                      <th className="th text-center">Check In</th>
-                      <th className="th text-center">Check Out</th>
-                      <th className="th text-center">Status</th>
-                      <th className="th text-right rounded-tr-xl">Quick Mark</th>
+                      <th className="th rounded-tl-xl">{t('common.code', 'Code')}</th>
+                      <th className="th">{t('common.name', 'Employee')}</th>
+                      <th className="th">{t('attendance.dept', 'Dept.')}</th>
+                      <th className="th text-center">{t('attendance.check_in', 'Check In')}</th>
+                      <th className="th text-center">{t('attendance.check_out', 'Check Out')}</th>
+                      <th className="th text-center">{t('common.status', 'Status')}</th>
+                      <th className="th text-right rounded-tr-xl">{t('attendance.quick_mark', 'Quick Mark')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -608,7 +614,7 @@ export default function AttendancePage() {
                                 className="text-xs text-indigo-600 hover:underline"
                                 onClick={() => { setCheckoutRow(r); setCheckoutTime(toLocalTime()); }}
                               >
-                                + Clock out
+                                {t('attendance.clock_out', '+ Clock out')}
                               </button>
                             ) : '—'}
                           </td>

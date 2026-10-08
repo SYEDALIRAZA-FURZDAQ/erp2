@@ -191,17 +191,17 @@ export default function PurchasePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Purchase & Supplier Management"
-        subtitle="Manage Vendors, Purchase Orders, Bills, and automated inventory receiving"
+        title={t('purchase.title', 'Purchase & Supplier Management')}
+        subtitle={t('purchase.subtitle', 'Manage Vendors, Purchase Orders, Bills, and automated inventory receiving')}
       >
         {tab === 'bills' && (
           <button className="btn" onClick={() => setShowBillModal(true)}>
-            + New Purchase Bill
+            {t('purchase.new_bill', '+ New Purchase Bill')}
           </button>
         )}
         {tab === 'vendors' && (
           <button className="btn" onClick={() => setShowVendorModal(true)}>
-            + New Supplier
+            {t('purchase.new_vendor', '+ New Supplier')}
           </button>
         )}
       </PageHeader>
@@ -219,7 +219,7 @@ export default function PurchasePage() {
           }`}
           onClick={() => setTab('bills')}
         >
-          Purchase Bills
+          {t('purchase.bills', 'Purchase Bills')}
         </button>
         <button
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
@@ -229,7 +229,7 @@ export default function PurchasePage() {
           }`}
           onClick={() => setTab('vendors')}
         >
-          Suppliers / Vendors Directory
+          {t('purchase.vendors', 'Suppliers / Vendors Directory')}
         </button>
       </div>
 
@@ -239,14 +239,14 @@ export default function PurchasePage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Bill #</th>
-                <th className="th">Date</th>
-                <th className="th">Supplier</th>
-                <th className="th text-right">Subtotal</th>
-                <th className="th text-right">Tax</th>
-                <th className="th text-right">Total (PKR)</th>
-                <th className="th text-center">Status</th>
-                <th className="th text-right">Actions</th>
+                <th className="th">{t('purchase.bill_number', 'Bill #')}</th>
+                <th className="th">{t('common.date', 'Date')}</th>
+                <th className="th">{t('purchase.supplier', 'Supplier')}</th>
+                <th className="th text-right">{t('common.subtotal', 'Subtotal')}</th>
+                <th className="th text-right">{t('purchase.tax', 'Tax')}</th>
+                <th className="th text-right">{t('sales.grand_total', 'Total (PKR)')}</th>
+                <th className="th text-center">{t('common.status', 'Status')}</th>
+                <th className="th text-right">{t('common.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -272,14 +272,14 @@ export default function PurchasePage() {
                   </td>
                   <td className="td text-right space-x-2">
                     <button className="btn-ghost text-xs" onClick={() => viewBillDetails(b.id)}>
-                      View Details
+                      {t('purchase.view_details', 'View Details')}
                     </button>
                     {b.status !== 'paid' && (
                       <button
                         className="btn bg-emerald-600 hover:bg-emerald-700 text-xs py-1 px-2.5"
                         onClick={() => handleUpdateStatus(b.id, 'paid')}
                       >
-                        Mark Paid
+                        {t('purchase.mark_paid', 'Mark Paid')}
                       </button>
                     )}
                   </td>
@@ -288,7 +288,7 @@ export default function PurchasePage() {
               {bills.length === 0 && !loading && (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-500">
-                    No purchase bills recorded yet.
+                    {t('common.no_records', 'No purchase bills recorded yet.')}
                   </td>
                 </tr>
               )}
@@ -303,13 +303,13 @@ export default function PurchasePage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Vendor Name</th>
+                <th className="th">{t('purchase.vendor_name', 'Vendor Name')}</th>
                 <th className="th">NTN / STRN</th>
-                <th className="th">Contact Person</th>
-                <th className="th">Phone & Email</th>
-                <th className="th">City</th>
-                <th className="th">Payment Terms</th>
-                <th className="th text-right">Total Purchases</th>
+                <th className="th">{t('purchase.contact_person', 'Contact Person')}</th>
+                <th className="th">{t('purchase.phone_email', 'Phone & Email')}</th>
+                <th className="th">{t('purchase.city', 'City')}</th>
+                <th className="th">{t('purchase.payment_terms', 'Payment Terms')}</th>
+                <th className="th text-right">{t('purchase.total_purchases', 'Total Purchases')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -339,7 +339,7 @@ export default function PurchasePage() {
               {vendors.length === 0 && !loading && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">
-                    No suppliers found. Add your first vendor.
+                    {t('common.no_records', 'No suppliers found. Add your first vendor.')}
                   </td>
                 </tr>
               )}
@@ -350,7 +350,7 @@ export default function PurchasePage() {
 
       {/* MODAL: Create Vendor */}
       {showVendorModal && (
-        <Modal title="Add Supplier / Vendor" onClose={() => setShowVendorModal(false)}>
+        <Modal title={t('purchase.add_supplier_title', 'Add Supplier / Vendor')} onClose={() => setShowVendorModal(false)}>
           <form onSubmit={handleCreateVendor} className="space-y-4">
             <div>
               <label className="label">Company / Vendor Name</label>
