@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base viewport fix ─────────────────────────────────── */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply antialiased;
+    overflow-x: hidden;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Prevent iOS input zoom */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+  @screen sm {
+    input, select, textarea {
+      font-size: 0.875rem; /* reset to text-sm on larger screens */
+    }
+  }
+}
+
+/* ─── Component tokens ──────────────────────────────────── */
+@layer components {
+  .input {
+    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none
+      focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-shadow;
+    /* Ensure 44px min touch target height */
+    min-height: 2.75rem;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2.5 text-sm
+      font-medium text-white hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 transition-all;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2
+      text-sm text-slate-700 hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 transition-all;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  .btn-sm {
+    @apply inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs
+      font-medium text-white hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 transition-all;
+    min-height: 2rem;
+  }
+
+  .btn-ghost-sm {
+    @apply inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5
+      text-xs text-slate-700 hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 transition-all;
+    min-height: 2rem;
+  }
+
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5;
+  }
+
+  .label {
+    @apply mb-1 block text-sm font-medium text-slate-700;
+  }
+
+  /* Table tokens */
+  .th {
+    @apply px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500
+      bg-slate-50 whitespace-nowrap;
+  }
+  .td {
+    @apply px-3 py-2.5 text-sm;
+  }
+
+  /* Responsive table wrapper — horizontally scrollable on mobile */
+  .table-wrap {
+    @apply w-full overflow-x-auto -mx-0 rounded-lg border border-slate-200;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-wrap table {
+    @apply min-w-full divide-y divide-slate-200;
+  }
+
+  /* Mobile card grid for stats */
+  .stat-grid {
+    @apply grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4;
+  }
+
+  /* Section title */
+  .section-title {
+    @apply text-base font-bold text-slate-900;
+  }
+
+  /* Form grid — 1 col on mobile, 2 on sm+ */
+  .form-grid {
+    @apply grid gap-3 grid-cols-1 sm:grid-cols-2;
+  }
+  .form-grid-3 {
+    @apply grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* ─── RTL overrides ─────────────────────────────────────── */
+[dir="rtl"] .th {
+  text-align: right;
+}
+
+[dir="rtl"] .th.text-right {
+  text-align: left;
+}
+
+[dir="rtl"] .td.text-right {
+  text-align: left;
+}
+
+[dir="rtl"] {
+  font-family: 'Noto Sans Arabic', 'Noto Nastaliq Urdu', 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0;
+}
+
+.font-urdu {
+  font-family: 'Noto Sans Arabic', 'Noto Nastaliq Urdu', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Smooth scrollbar (desktop) ───────────────────────── */
+@media (pointer: fine) {
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
+}
