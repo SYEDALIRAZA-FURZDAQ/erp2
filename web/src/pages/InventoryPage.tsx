@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, post } from '../lib/api';
+import { useTranslation } from '../lib/i18n';
 import { ErrorBox, Modal, PageHeader, StatusBadge, SuccessBox } from '../components/ui';
 
 interface InventoryItem {
@@ -42,6 +43,7 @@ interface StockMovement {
 }
 
 export default function InventoryPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'items' | 'movements' | 'warehouses'>('items');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);

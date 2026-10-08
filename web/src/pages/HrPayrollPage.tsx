@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, post, put, del } from '../lib/api';
 import { ErrorBox, Modal, PageHeader, StatusBadge, SuccessBox } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { useTranslation } from '../lib/i18n';
 
 interface Employee {
   id: string;
@@ -61,6 +62,7 @@ const MONTHS = [
 
 export default function HrPayrollPage() {
   const { session } = useAuth();
+  const { t } = useTranslation();
   const isOwner = session?.user?.isOwner ?? false;
 
   const [tab, setTab] = useState<'employees' | 'payroll'>('employees');
@@ -314,17 +316,17 @@ export default function HrPayrollPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="HR & Payroll (Pakistan Compliant)"
-        subtitle="Manage employees, salary structures, income tax calculation, EOBI social security, and payslips"
+        title={t('hr.title', 'HR & Payroll (Pakistan Compliant)')}
+        subtitle={t('hr.subtitle', 'Manage employees, salary structures, income tax calculation, EOBI social security, and payslips')}
       >
         {tab === 'employees' && (
           <button className="btn" onClick={() => setShowEmployeeModal(true)}>
-            + Add Employee
+            {t('hr.add_employee', '+ Add Employee')}
           </button>
         )}
         {tab === 'payroll' && (
           <button className="btn" onClick={() => setShowGenerateModal(true)}>
-            ⚡ Generate Monthly Payroll
+            {t('hr.generate_payroll', '⚡ Generate Monthly Payroll')}
           </button>
         )}
       </PageHeader>
@@ -342,7 +344,7 @@ export default function HrPayrollPage() {
           }`}
           onClick={() => setTab('employees')}
         >
-          Employees Directory
+          {t('hr.employees', 'Employees Directory')}
         </button>
         <button
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
@@ -352,7 +354,7 @@ export default function HrPayrollPage() {
           }`}
           onClick={() => setTab('payroll')}
         >
-          Payroll Runs & Disbursements
+          {t('hr.payroll', 'Payroll Runs & Disbursements')}
         </button>
       </div>
 
@@ -362,15 +364,15 @@ export default function HrPayrollPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Emp Code</th>
-                <th className="th">Full Name</th>
+                <th className="th">{t('common.code', 'Emp Code')}</th>
+                <th className="th">{t('common.name', 'Full Name')}</th>
                 <th className="th">CNIC</th>
-                <th className="th">Department / Role</th>
-                <th className="th text-right">Basic Salary</th>
-                <th className="th text-right">Allowances</th>
-                <th className="th text-right">Gross Salary</th>
-                <th className="th text-center">Status</th>
-                <th className="th text-right">Action</th>
+                <th className="th">{t('common.details', 'Department / Role')}</th>
+                <th className="th text-right">{t('hr.basic_salary', 'Basic Salary')}</th>
+                <th className="th text-right">{t('hr.allowances', 'Allowances')}</th>
+                <th className="th text-right">{t('hr.gross_salary', 'Gross Salary')}</th>
+                <th className="th text-center">{t('common.status', 'Status')}</th>
+                <th className="th text-right">{t('common.actions', 'Action')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -407,7 +409,7 @@ export default function HrPayrollPage() {
                         className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs py-1 px-2.5 font-medium border border-indigo-200 shadow-2xs"
                         onClick={() => startEditEmployee(emp)}
                       >
-                        ✏️ Edit
+                        ✏️ {t('common.edit', 'Edit')}
                       </button>
                     </td>
                   </tr>
@@ -432,14 +434,14 @@ export default function HrPayrollPage() {
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="th">Run #</th>
-                <th className="th">Period</th>
-                <th className="th text-center">Staff Count</th>
-                <th className="th text-right">Total Gross</th>
-                <th className="th text-right">Tax Withheld</th>
-                <th className="th text-right">EOBI Deduct</th>
-                <th className="th text-right">Net Payable</th>
-                <th className="th text-center">Status</th>
-                <th className="th text-right">Actions</th>
+                <th className="th">{t('common.date', 'Period')}</th>
+                <th className="th text-center">{t('attendance.total_staff', 'Staff Count')}</th>
+                <th className="th text-right">{t('hr.gross_salary', 'Total Gross')}</th>
+                <th className="th text-right">{t('hr.income_tax', 'Tax Withheld')}</th>
+                <th className="th text-right">{t('hr.eobi', 'EOBI Deduct')}</th>
+                <th className="th text-right">{t('hr.net_salary', 'Net Payable')}</th>
+                <th className="th text-center">{t('common.status', 'Status')}</th>
+                <th className="th text-right">{t('common.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { PageHeader, StatCard, StatusBadge } from '../components/ui';
+import { useTranslation } from '../lib/i18n';
 
 export default function Dashboard() {
   const { session } = useAuth();
+  const { t } = useTranslation();
   const [stats, setStats] = useState({
     totalSales: 0,
     invoiceCount: 0,
@@ -53,42 +55,42 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Welcome, ${session?.user.fullName}`}
-        subtitle={`${session?.tenant.name} • ERP Operations Hub`}
+        title={`${t('dashboard.title', 'Welcome')}, ${session?.user.fullName}`}
+        subtitle={`${session?.tenant.name} • ${t('dashboard.subtitle', 'ERP Operations Hub')}`}
       >
         <Link to="/sales" className="btn bg-indigo-600 hover:bg-indigo-700">
-          + Create Sales Invoice
+          {t('dashboard.create_invoice', '+ Create Sales Invoice')}
         </Link>
         <Link to="/accounting" className="btn-ghost">
-          Financial Ledger
+          {t('nav.accounting', 'Financial Ledger')}
         </Link>
       </PageHeader>
 
       {/* KPI Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Sales (PKR)"
+          title={t('dashboard.total_sales', 'Total Sales (PKR)')}
           value={`PKR ${stats.totalSales.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
-          subtext={`${stats.invoiceCount} invoices recorded`}
+          subtext={`${stats.invoiceCount} ${t('common.records', 'invoices recorded')}`}
           icon="💰"
           badge="FBR POS Sync Active"
         />
         <StatCard
-          title="Inventory Items"
+          title={t('dashboard.total_items', 'Inventory Items')}
           value={stats.totalItems}
-          subtext={stats.lowStockCount > 0 ? `${stats.lowStockCount} item(s) low stock` : 'Healthy stock levels'}
+          subtext={stats.lowStockCount > 0 ? `${stats.lowStockCount} ${t('inventory.low_stock', 'low stock')}` : t('inventory.optimal', 'Healthy stock levels')}
           icon="📦"
           badge={stats.lowStockCount > 0 ? '⚠️ Restock Required' : '✓ Stocked'}
         />
         <StatCard
-          title="Staff & Attendance"
+          title={t('attendance.total_staff', 'Staff & Attendance')}
           value={`${stats.presentToday} / ${stats.totalEmployees}`}
-          subtext="Employees present today"
+          subtext={t('dashboard.present_today', 'Employees present today')}
           icon="👥"
           badge="HR & Payroll Online"
         />
         <StatCard
-          title="Active Projects"
+          title={t('dashboard.active_projects', 'Active Projects')}
           value={stats.activeProjects}
           subtext="Ongoing client engagements"
           icon="🚀"
@@ -100,14 +102,14 @@ export default function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Quick Launchpad */}
         <div className="card space-y-4">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">Business Modules</h2>
+          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">{t('dashboard.quick_actions', 'Business Modules')}</h2>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <Link
               to="/accounting"
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">📊</div>
-              <div>Accounting</div>
+              <div>{t('nav.accounting', 'Accounting')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Chart of Accounts, JV, Reports</div>
             </Link>
             <Link
@@ -115,7 +117,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">🧾</div>
-              <div>Sales & FBR</div>
+              <div>{t('nav.sales', 'Sales & FBR')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Digital Invoicing, QR code</div>
             </Link>
             <Link
@@ -123,7 +125,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">📦</div>
-              <div>Inventory</div>
+              <div>{t('nav.inventory', 'Inventory')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Warehouses & Stock movements</div>
             </Link>
             <Link
@@ -131,7 +133,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">🛍️</div>
-              <div>Purchase</div>
+              <div>{t('nav.purchase', 'Purchase')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Suppliers & Bills</div>
             </Link>
             <Link
@@ -139,7 +141,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">👥</div>
-              <div>HR & Payroll</div>
+              <div>{t('nav.hr_payroll', 'HR & Payroll')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Salaries, Tax, EOBI & Slips</div>
             </Link>
             <Link
@@ -147,7 +149,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">📅</div>
-              <div>Attendance</div>
+              <div>{t('nav.attendance', 'Attendance')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Daily Check-ins & Leaves</div>
             </Link>
             <Link
@@ -155,7 +157,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">🏢</div>
-              <div>Fixed Assets</div>
+              <div>{t('nav.assets', 'Fixed Assets')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Register & Depreciation</div>
             </Link>
             <Link
@@ -163,7 +165,7 @@ export default function Dashboard() {
               className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all block font-medium text-slate-800"
             >
               <div className="text-lg mb-1">🎯</div>
-              <div>Projects</div>
+              <div>{t('nav.projects', 'Projects')}</div>
               <div className="text-[10px] text-slate-400 font-normal">Tasks & Timesheets</div>
             </Link>
           </div>
@@ -172,9 +174,9 @@ export default function Dashboard() {
         {/* Recent Invoices Activity */}
         <div className="lg:col-span-2 card space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h2 className="text-base font-bold text-slate-900">Recent Sales & Invoicing</h2>
+            <h2 className="text-base font-bold text-slate-900">{t('dashboard.recent_invoices', 'Recent Sales & Invoicing')}</h2>
             <Link to="/sales" className="text-xs font-semibold text-indigo-600 hover:underline">
-              View all invoices →
+              {t('common.details', 'View all invoices →')}
             </Link>
           </div>
 
@@ -183,10 +185,10 @@ export default function Dashboard() {
               <thead>
                 <tr className="border-b text-slate-500 font-semibold">
                   <th className="py-2">Invoice #</th>
-                  <th className="py-2">Customer</th>
-                  <th className="py-2 text-right">Amount (PKR)</th>
-                  <th className="py-2 text-center">FBR Status</th>
-                  <th className="py-2 text-center">Status</th>
+                  <th className="py-2">{t('common.name', 'Customer')}</th>
+                  <th className="py-2 text-right">{t('common.total', 'Amount (PKR)')}</th>
+                  <th className="py-2 text-center">{t('sales.fbr_status', 'FBR Status')}</th>
+                  <th className="py-2 text-center">{t('common.status', 'Status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -203,7 +205,7 @@ export default function Dashboard() {
                           inv.fbrStatus === 'reported' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                         }`}
                       >
-                        {inv.fbrStatus === 'reported' ? '✓ FBR Verified' : 'Pending FBR'}
+                        {inv.fbrStatus === 'reported' ? t('sales.fbr_verified', '✓ FBR Verified') : t('sales.fbr_pending', 'Pending FBR')}
                       </span>
                     </td>
                     <td className="py-2.5 text-center">
@@ -214,7 +216,7 @@ export default function Dashboard() {
                 {recentInvoices.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-400">
-                      No invoices recorded yet. Start by generating an invoice.
+                      {t('dashboard.no_invoices', 'No invoices recorded yet. Start by generating an invoice.')}
                     </td>
                   </tr>
                 )}
