@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, post } from '../lib/api';
+import { useTranslation } from '../lib/i18n';
 import { ErrorBox, Modal, PageHeader, StatusBadge, SuccessBox } from '../components/ui';
 
 interface Vendor {
@@ -42,6 +43,7 @@ interface Warehouse {
 }
 
 export default function PurchasePage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'bills' | 'vendors'>('bills');
   const [bills, setBills] = useState<PurchaseBill[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);

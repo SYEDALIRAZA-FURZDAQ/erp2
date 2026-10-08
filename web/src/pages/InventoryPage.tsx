@@ -169,20 +169,20 @@ export default function InventoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inventory & Stock Control"
-        subtitle="Item catalog, multi-warehouse stock levels, reorder tracking, and movements"
+        title={t('inventory.title', 'Inventory & Stock Control')}
+        subtitle={t('inventory.subtitle', 'Item catalog, multi-warehouse stock levels, reorder tracking, and movements')}
       >
         <button className="btn-ghost" onClick={() => setShowMovementModal(true)}>
-          ± Adjust Stock
+          {t('inventory.adjust_stock', '± Adjust Stock')}
         </button>
         {tab === 'items' && (
           <button className="btn" onClick={() => setShowItemModal(true)}>
-            + New Item
+            {t('inventory.new_item', '+ New Item')}
           </button>
         )}
         {tab === 'warehouses' && (
           <button className="btn" onClick={() => setShowWarehouseModal(true)}>
-            + New Warehouse
+            {t('inventory.new_warehouse', '+ New Warehouse')}
           </button>
         )}
       </PageHeader>
@@ -200,7 +200,7 @@ export default function InventoryPage() {
           }`}
           onClick={() => setTab('items')}
         >
-          Items Catalog & Stock
+          {t('inventory.items', 'Items Catalog & Stock')}
         </button>
         <button
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
@@ -210,7 +210,7 @@ export default function InventoryPage() {
           }`}
           onClick={() => setTab('movements')}
         >
-          Stock Movements Ledger
+          {t('inventory.movements', 'Stock Movements Ledger')}
         </button>
         <button
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
@@ -220,7 +220,7 @@ export default function InventoryPage() {
           }`}
           onClick={() => setTab('warehouses')}
         >
-          Warehouses
+          {t('inventory.warehouses', 'Warehouses')}
         </button>
       </div>
 
@@ -230,13 +230,13 @@ export default function InventoryPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">SKU</th>
-                <th className="th">Item Name</th>
-                <th className="th">Category</th>
-                <th className="th text-right">Cost Price</th>
-                <th className="th text-right">Selling Price</th>
-                <th className="th text-right">In Stock</th>
-                <th className="th text-center">Stock Level</th>
+                <th className="th">{t('inventory.sku', 'SKU')}</th>
+                <th className="th">{t('inventory.item_name', 'Item Name')}</th>
+                <th className="th">{t('inventory.category', 'Category')}</th>
+                <th className="th text-right">{t('inventory.cost_price', 'Cost Price')}</th>
+                <th className="th text-right">{t('inventory.selling_price', 'Selling Price')}</th>
+                <th className="th text-right">{t('inventory.in_stock', 'In Stock')}</th>
+                <th className="th text-center">{t('common.status', 'Stock Level')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -257,11 +257,11 @@ export default function InventoryPage() {
                   <td className="td text-center">
                     {i.isLowStock ? (
                       <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
-                        Low Stock (≤{i.reorderLevel})
+                        {t('inventory.low_stock', 'Low Stock')} (≤{i.reorderLevel})
                       </span>
                     ) : (
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                        Optimal
+                        {t('inventory.optimal', 'Optimal')}
                       </span>
                     )}
                   </td>
@@ -270,7 +270,7 @@ export default function InventoryPage() {
               {items.length === 0 && !loading && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">
-                    No inventory items found. Add your first product.
+                    {t('common.no_records', 'No inventory items found. Add your first product.')}
                   </td>
                 </tr>
               )}
@@ -285,13 +285,13 @@ export default function InventoryPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Date</th>
-                <th className="th">Item SKU & Name</th>
-                <th className="th">Warehouse</th>
-                <th className="th">Type</th>
-                <th className="th text-right">Quantity</th>
-                <th className="th text-right">Unit Cost</th>
-                <th className="th">Reference</th>
+                <th className="th">{t('common.date', 'Date')}</th>
+                <th className="th">{t('inventory.item_name', 'Item SKU & Name')}</th>
+                <th className="th">{t('inventory.warehouses', 'Warehouse')}</th>
+                <th className="th">{t('accounting.type', 'Type')}</th>
+                <th className="th text-right">{t('inventory.quantity', 'Quantity')}</th>
+                <th className="th text-right">{t('inventory.unit_cost', 'Unit Cost')}</th>
+                <th className="th">{t('inventory.reference_note', 'Reference')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -312,7 +312,7 @@ export default function InventoryPage() {
                           : 'bg-blue-100 text-blue-800'
                       }`}
                     >
-                      {m.movementType}
+                      {m.movementType === 'in' ? t('inventory.stock_in', 'In') : m.movementType === 'out' ? t('inventory.stock_out', 'Out') : t('inventory.count_adj', 'Adjustment')}
                     </span>
                   </td>
                   <td className="td text-right font-mono font-bold text-slate-900">
@@ -327,7 +327,7 @@ export default function InventoryPage() {
               {movements.length === 0 && !loading && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">
-                    No stock movements recorded yet.
+                    {t('common.no_records', 'No stock movements recorded yet.')}
                   </td>
                 </tr>
               )}
@@ -352,8 +352,8 @@ export default function InventoryPage() {
                 <p className="text-xs text-slate-500 mt-0.5">{w.address || 'Address not specified'}</p>
               </div>
               <div className="border-t border-slate-100 pt-3 flex justify-between text-xs text-slate-600">
-                <span>Unique Products: <b>{w.uniqueItemCount}</b></span>
-                <span>Total Units: <b className="font-mono">{Number(w.totalUnitsInStock).toLocaleString()}</b></span>
+                <span>{t('inventory.unique_products', 'Unique Products')}: <b>{w.uniqueItemCount}</b></span>
+                <span>{t('inventory.total_units', 'Total Units')}: <b className="font-mono">{Number(w.totalUnitsInStock).toLocaleString()}</b></span>
               </div>
             </div>
           ))}
@@ -362,11 +362,11 @@ export default function InventoryPage() {
 
       {/* MODAL: Create Item */}
       {showItemModal && (
-        <Modal title="Add Item to Catalog" onClose={() => setShowItemModal(false)}>
+        <Modal title={t('inventory.add_item_title', 'Add Item to Catalog')} onClose={() => setShowItemModal(false)}>
           <form onSubmit={handleCreateItem} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">SKU / Code</label>
+                <label className="label">{t('inventory.sku', 'SKU / Code')}</label>
                 <input
                   type="text"
                   className="input"
@@ -377,7 +377,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="label">Category</label>
+                <label className="label">{t('inventory.category', 'Category')}</label>
                 <input
                   type="text"
                   className="input"
@@ -388,7 +388,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <div>
-              <label className="label">Item Name</label>
+              <label className="label">{t('inventory.item_name', 'Item Name')}</label>
               <input
                 type="text"
                 className="input"
@@ -400,7 +400,7 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="label">Unit of Measure</label>
+                <label className="label">{t('inventory.uom', 'Unit of Measure')}</label>
                 <input
                   type="text"
                   className="input"
@@ -410,7 +410,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="label">Cost Price (PKR)</label>
+                <label className="label">{t('inventory.cost_price', 'Cost Price (PKR)')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -420,7 +420,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="label">Selling Price</label>
+                <label className="label">{t('inventory.selling_price', 'Selling Price')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -432,7 +432,7 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Sales Tax Rate (%)</label>
+                <label className="label">{t('inventory.tax_rate', 'Sales Tax Rate (%)')}</label>
                 <input
                   type="number"
                   step="1"
@@ -442,7 +442,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="label">Reorder Level Alert</label>
+                <label className="label">{t('inventory.reorder_level', 'Reorder Level Alert')}</label>
                 <input
                   type="number"
                   step="1"
@@ -454,10 +454,10 @@ export default function InventoryPage() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => setShowItemModal(false)}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </button>
               <button type="submit" className="btn">
-                Save Item
+                {t('common.save', 'Save Item')}
               </button>
             </div>
           </form>
@@ -466,10 +466,10 @@ export default function InventoryPage() {
 
       {/* MODAL: Create Warehouse */}
       {showWarehouseModal && (
-        <Modal title="Create Warehouse" onClose={() => setShowWarehouseModal(false)}>
+        <Modal title={t('inventory.create_warehouse_title', 'Create Warehouse')} onClose={() => setShowWarehouseModal(false)}>
           <form onSubmit={handleCreateWarehouse} className="space-y-4">
             <div>
-              <label className="label">Warehouse Code</label>
+              <label className="label">{t('inventory.warehouse_code', 'Warehouse Code')}</label>
               <input
                 type="text"
                 className="input"
@@ -480,7 +480,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <label className="label">Warehouse Name</label>
+              <label className="label">{t('inventory.warehouse_name', 'Warehouse Name')}</label>
               <input
                 type="text"
                 className="input"
@@ -491,7 +491,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <label className="label">Address / Location</label>
+              <label className="label">{t('inventory.address', 'Address / Location')}</label>
               <input
                 type="text"
                 className="input"
@@ -502,10 +502,10 @@ export default function InventoryPage() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => setShowWarehouseModal(false)}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </button>
               <button type="submit" className="btn">
-                Save Warehouse
+                {t('common.save', 'Save Warehouse')}
               </button>
             </div>
           </form>
@@ -514,10 +514,10 @@ export default function InventoryPage() {
 
       {/* MODAL: Stock Movement */}
       {showMovementModal && (
-        <Modal title="Record Stock Adjustment / Movement" onClose={() => setShowMovementModal(false)}>
+        <Modal title={t('inventory.movement_title', 'Record Stock Adjustment / Movement')} onClose={() => setShowMovementModal(false)}>
           <form onSubmit={handleCreateMovement} className="space-y-4">
             <div>
-              <label className="label">Item</label>
+              <label className="label">{t('inventory.items', 'Item')}</label>
               <select
                 className="input"
                 required
@@ -533,14 +533,14 @@ export default function InventoryPage() {
               >
                 {items.map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.sku} - {i.name} (In Stock: {i.currentStock})
+                    {i.sku} - {i.name} ({t('inventory.in_stock', 'In Stock')}: {i.currentStock})
                   </option>
                 ))}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Warehouse</label>
+                <label className="label">{t('inventory.warehouses', 'Warehouse')}</label>
                 <select
                   className="input"
                   required
@@ -555,21 +555,21 @@ export default function InventoryPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Movement Type</label>
+                <label className="label">{t('inventory.movement_type', 'Movement Type')}</label>
                 <select
                   className="input"
                   value={movementForm.movementType}
                   onChange={(e) => setMovementForm({ ...movementForm, movementType: e.target.value })}
                 >
-                  <option value="in">Stock In (Receipt / Found)</option>
-                  <option value="out">Stock Out (Issue / Scrap)</option>
-                  <option value="adjustment">Count Adjustment</option>
+                  <option value="in">{t('inventory.stock_in', 'Stock In (Receipt / Found)')}</option>
+                  <option value="out">{t('inventory.stock_out', 'Stock Out (Issue / Scrap)')}</option>
+                  <option value="adjustment">{t('inventory.count_adj', 'Count Adjustment')}</option>
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Quantity</label>
+                <label className="label">{t('inventory.quantity', 'Quantity')}</label>
                 <input
                   type="number"
                   step="1"
@@ -580,7 +580,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="label">Unit Cost (PKR)</label>
+                <label className="label">{t('inventory.unit_cost', 'Unit Cost (PKR)')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -591,7 +591,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <div>
-              <label className="label">Reference / Note</label>
+              <label className="label">{t('inventory.reference_note', 'Reference / Note')}</label>
               <input
                 type="text"
                 className="input"
@@ -602,10 +602,10 @@ export default function InventoryPage() {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => setShowMovementModal(false)}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </button>
               <button type="submit" className="btn">
-                Record Movement
+                {t('common.save', 'Record Movement')}
               </button>
             </div>
           </form>
