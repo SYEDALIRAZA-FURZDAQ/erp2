@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, clientIp, requirePermission } from '../../middleware/auth';
 import { withTenant } from '../../db/pool';
-import { asyncHandler, badRequest, notFound } from '../../utils/errors';
+import { asyncHandler, badRequest, forbidden, notFound } from '../../utils/errors';
 import { writeAudit } from '../audit/audit.service';
 import { nextDocNumber } from '../numbering/numbering.service';
+import { verifyPassword } from '../../utils/password';
 
 export const assetsRouter = Router();
 assetsRouter.use(authenticate);
@@ -184,6 +185,90 @@ assetsRouter.post(
       });
 
       return { amount: monthlyDepreciation, ...updated.rows[0] };
+    });
+
+    res.json(out);
+  }),
+);
+
+// -------------------------------------------------------------
+// Delete Fixed Asset (owner password-protected)
+// Removes the asset, all depreciation logs, and linked journal
+// entries that were posted for this asset's depreciation runs.
+// -------------------------------------------------------------
+assetsRouter.delete(
+  '/:id',
+  requirePermission('assets.register.manage'),
+  asyncHandler(async (req, res) => {
+    const { isOwner, userId, tenantId } = req.auth!;
+    if (!isOwner) throw forbidden('Access denied. Only the company owner can delete fixed assets.');
+
+    const { password } = z.object({
+      password: z.string().min(1, 'Owner password is required to authorize asset deletion'),
+    }).parse(req.body);
+
+    const out = await withTenant(tenantId, async (db) => {
+      // Verify owner password
+      const userRes = await db.query('SELECT password_hash, is_owner FROM users WHERE id = $1', [userId]);
+      const user = userRes.rows[0];
+      if (!user?.is_owner) throw forbidden('Owner account required');
+
+      const ok = await verifyPassword(password, user.password_hash);
+      if (!ok) throw badRequest('Invalid owner password. Deletion authorization failed.');
+
+      // Fetch the asset
+      const assetRes = await db.query(
+        `SELECT id, asset_code, name, category, purchase_cost, accumulated_depreciation, current_value, status
+           FROM fixed_assets WHERE id = $1`,
+        [req.params.id]
+      );
+      const asset = assetRes.rows[0];
+      if (!asset) throw notFound('Fixed asset not found');
+
+      // Count depreciation logs
+      const logRes = await db.query(
+        'SELECT count(*)::int AS n FROM asset_depreciation_logs WHERE asset_id = $1',
+        [req.params.id]
+      );
+      const depreciationRunCount: number = logRes.rows[0].n;
+
+      // Purge linked depreciation journal entries (matched by asset_code reference)
+      const linkedJvs = await db.query(
+        `SELECT id, entry_number FROM journal_entries WHERE reference = $1 OR narration LIKE $2`,
+        [asset.asset_code, `%${asset.asset_code}%`]
+      );
+      if (linkedJvs.rows.length > 0) {
+        const jvIds = linkedJvs.rows.map((r: any) => r.id);
+        await db.query('DELETE FROM journal_entry_lines WHERE entry_id = ANY($1)', [jvIds]);
+        await db.query('DELETE FROM journal_entries WHERE id = ANY($1)', [jvIds]);
+      }
+
+      // Delete depreciation logs
+      await db.query('DELETE FROM asset_depreciation_logs WHERE asset_id = $1', [req.params.id]);
+
+      // Delete the asset itself
+      await db.query('DELETE FROM fixed_assets WHERE id = $1', [req.params.id]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId,
+        action: 'fixed_asset.delete',
+        entity: 'fixed_asset',
+        entityId: req.params.id,
+        newValue: {
+          assetCode: asset.asset_code,
+          name: asset.name,
+          purchaseCost: asset.purchase_cost,
+          depreciationRunsDeleted: depreciationRunCount,
+          journalEntriesDeleted: linkedJvs.rows.map((r: any) => r.entry_number),
+        },
+        ip: clientIp(req),
+      });
+
+      return {
+        success: true,
+        message: `Fixed asset '${asset.name}' (${asset.asset_code}) deleted. ${depreciationRunCount} depreciation log(s) and ${linkedJvs.rows.length} journal entry(ies) have been removed.`,
+      };
     });
 
     res.json(out);

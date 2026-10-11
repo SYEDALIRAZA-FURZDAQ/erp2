@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, patch, post } from '../lib/api';
+import { api, del, patch, post } from '../lib/api';
 import { ErrorBox, Modal, PageHeader, StatusBadge, SuccessBox } from '../components/ui';
 
 interface Project {
@@ -60,6 +60,11 @@ export default function ProjectsPage() {
   // Modals
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
+
+  // Delete Project State
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Add Task / Timesheet states
   const [taskTitle, setTaskTitle] = useState('');
@@ -170,6 +175,26 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleDeleteProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingProject || deleteConfirm !== 'DELETE') return;
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      const res = await del<{ success: boolean; message: string }>(`/projects/${deletingProject.id}`);
+      setSuccess(res.message);
+      // Close detail modal if we're deleting the currently open project
+      if (selectedProject?.id === deletingProject.id) setSelectedProject(null);
+      setDeletingProject(null);
+      setDeleteConfirm('');
+      loadData();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -190,24 +215,40 @@ export default function ProjectsPage() {
           const budget = Number(p.budget);
           const expenses = Number(p.totalExpensesLogged);
           return (
-            <div
-              key={p.id}
-              className="card flex flex-col justify-between space-y-4 hover:border-indigo-300 transition-all cursor-pointer"
-              onClick={() => viewProjectDetails(p.id)}
-            >
+            <div key={p.id} className="card flex flex-col justify-between space-y-4 hover:border-indigo-300 transition-all">
+              {/* Header row: code badge + status + delete button */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                  <span
+                    className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded cursor-pointer"
+                    onClick={() => viewProjectDetails(p.id)}
+                  >
                     {p.code}
                   </span>
-                  <StatusBadge status={p.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={p.status} />
+                    <button
+                      className="rounded-md p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Delete project"
+                      onClick={(e) => { e.stopPropagation(); setDeletingProject(p); setDeleteConfirm(''); }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <h3 className="font-bold text-slate-900 text-base">{p.name}</h3>
+                <h3
+                  className="font-bold text-slate-900 text-base cursor-pointer hover:text-indigo-700"
+                  onClick={() => viewProjectDetails(p.id)}
+                >
+                  {p.name}
+                </h3>
                 <p className="text-xs text-slate-500">Client: {p.clientName || 'Internal Company'}</p>
               </div>
 
               {/* Progress Bar */}
-              <div>
+              <div onClick={() => viewProjectDetails(p.id)} className="cursor-pointer">
                 <div className="flex justify-between text-xs text-slate-600 mb-1">
                   <span>Progress</span>
                   <span className="font-semibold">{p.progressPercent}%</span>
@@ -221,7 +262,10 @@ export default function ProjectsPage() {
               </div>
 
               {/* Financials & Tasks metrics */}
-              <div className="border-t border-slate-100 pt-3 grid grid-cols-2 gap-2 text-xs">
+              <div
+                className="border-t border-slate-100 pt-3 grid grid-cols-2 gap-2 text-xs cursor-pointer"
+                onClick={() => viewProjectDetails(p.id)}
+              >
                 <div>
                   <span className="text-slate-500">Budget:</span>
                   <p className="font-mono font-bold text-slate-900">PKR {budget.toLocaleString('en-PK')}</p>
@@ -233,9 +277,7 @@ export default function ProjectsPage() {
                   </p>
                 </div>
                 <div className="col-span-2 flex justify-between items-center text-indigo-600 font-semibold pt-1">
-                  <span>
-                    Tasks: {p.completedTaskCount} / {p.taskCount} completed
-                  </span>
+                  <span>Tasks: {p.completedTaskCount} / {p.taskCount} completed</span>
                   <span>View Details →</span>
                 </div>
               </div>
@@ -487,6 +529,89 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Delete Project — Type DELETE to confirm */}
+      {deletingProject && (
+        <Modal
+          title={`Delete Project: ${deletingProject.code}`}
+          onClose={() => { if (!deleteLoading) { setDeletingProject(null); setDeleteConfirm(''); } }}
+        >
+          <form onSubmit={handleDeleteProject} className="space-y-4 text-xs">
+            {/* Danger notice */}
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-rose-800 space-y-1.5">
+              <p className="font-bold text-rose-900 text-sm">⚠️ Permanent Deletion Warning</p>
+              <p>Deleting this project will permanently remove:</p>
+              <ul className="list-disc list-inside pl-1 space-y-0.5">
+                <li>The project record and all metadata</li>
+                <li>All <strong>{deletingProject.taskCount} task(s)</strong></li>
+                <li>All timesheet / expense entries logged</li>
+              </ul>
+              <p className="font-semibold text-rose-950 pt-1">This cannot be undone.</p>
+            </div>
+
+            {/* Project summary */}
+            <div className="bg-slate-50 p-3 rounded border border-slate-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                    {deletingProject.code}
+                  </span>
+                  <p className="font-semibold text-slate-800 mt-1.5">{deletingProject.name}</p>
+                  <p className="text-slate-500 mt-0.5">Client: {deletingProject.clientName || 'Internal'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-500">Budget:</p>
+                  <p className="font-mono font-bold text-slate-900">PKR {Number(deletingProject.budget).toLocaleString('en-PK')}</p>
+                  <p className="text-slate-400 mt-1">{deletingProject.taskCount} task(s) · {deletingProject.totalHoursLogged} hrs logged</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <StatusBadge status={deletingProject.status} />
+              </div>
+            </div>
+
+            {/* Type DELETE confirmation */}
+            <div>
+              <label className="label text-xs font-semibold text-slate-800">
+                Type <strong className="text-rose-700 tracking-widest">DELETE</strong> to confirm *
+              </label>
+              <input
+                id="delete-project-confirm"
+                type="text"
+                required
+                className="input font-mono tracking-widest"
+                placeholder="Type DELETE here..."
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {deleteConfirm.length > 0 && deleteConfirm !== 'DELETE' && (
+                <p className="text-[11px] text-rose-500 mt-0.5">Must be exactly DELETE in capital letters.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={deleteLoading}
+                onClick={() => { setDeletingProject(null); setDeleteConfirm(''); }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn bg-rose-600 hover:bg-rose-700 text-xs py-2 px-4 shadow-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={deleteLoading || deleteConfirm !== 'DELETE'}
+              >
+                {deleteLoading ? 'Deleting…' : '🗑️ Delete Project Permanently'}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

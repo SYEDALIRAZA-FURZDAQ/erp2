@@ -716,6 +716,10 @@ function OwnerReversalCard({ isOwner }: { isOwner: boolean }) {
       void qc.invalidateQueries({ queryKey: ['reversible-transactions'] });
       void qc.invalidateQueries({ queryKey: ['payroll'] });
       void qc.invalidateQueries({ queryKey: ['vouchers'] });
+      void qc.invalidateQueries({ queryKey: ['invoices'] });
+      void qc.invalidateQueries({ queryKey: ['sales'] });
+      void qc.invalidateQueries({ queryKey: ['accounting'] });
+      void qc.invalidateQueries({ queryKey: ['reports'] });
       setTimeout(() => setActionSuccess(null), 5000);
     } catch (err: any) {
       setActionError(err.message || 'Transaction reversal failed.');

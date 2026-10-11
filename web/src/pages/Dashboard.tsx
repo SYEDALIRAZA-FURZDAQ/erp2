@@ -22,21 +22,29 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const [invRes, itms, emps, attSum, prjs] = await Promise.all([
-          api<{ items: any[] }>('/sales/invoices').catch(() => ({ items: [] })),
+        const [invRes, itms, emps, attSum, prjs, incRes] = await Promise.all([
+          api<{ items: any[]; total?: number }>('/sales/invoices').catch(() => ({ items: [], total: 0 })),
           api<any[]>('/inventory/items').catch(() => []),
           api<any[]>('/hr/employees').catch(() => []),
           api<any>('/attendance/summary').catch(() => ({ present: 0 })),
           api<any[]>('/projects').catch(() => []),
+          api<{ totalRevenue?: number }>('/accounting/reports/income-statement').catch(() => null),
         ]);
 
-        const totalSales = invRes.items.reduce((s, i) => s + Number(i.grandTotal), 0);
+        const activeInvoices = (invRes.items || []).filter((i) => i.status !== 'cancelled');
+        const activeInvoiceSales = activeInvoices.reduce((s, i) => s + Number(i.grandTotal), 0);
+
+        // Synchronize with Accounting ledger revenue so Dashboard and Accounts remain in 100% lockstep
+        const totalSales = incRes && incRes.totalRevenue !== undefined
+          ? Number(incRes.totalRevenue)
+          : activeInvoiceSales;
+
         const lowStockCount = itms.filter((i) => i.isLowStock).length;
         const activeProjects = prjs.filter((p) => p.status === 'in_progress').length;
 
         setStats({
           totalSales,
-          invoiceCount: invRes.items.length,
+          invoiceCount: activeInvoices.length,
           totalItems: itms.length,
           lowStockCount,
           totalEmployees: emps.length,
@@ -44,7 +52,7 @@ export default function Dashboard() {
           activeProjects,
         });
 
-        setRecentInvoices(invRes.items.slice(0, 5));
+        setRecentInvoices((invRes.items || []).slice(0, 5));
       } catch {
         // fail silently for initial loads
       }
@@ -71,7 +79,7 @@ export default function Dashboard() {
         <StatCard
           title={t('dashboard.total_sales', 'Total Sales (PKR)')}
           value={`PKR ${stats.totalSales.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
-          subtext={`${stats.invoiceCount} ${t('common.records', 'invoices recorded')}`}
+          subtext={`${stats.invoiceCount} ${t('common.records', 'active invoices')}`}
           icon="💰"
           badge="FBR POS Sync Active"
         />

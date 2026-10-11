@@ -161,7 +161,19 @@ export default function SalesPage() {
     e.preventDefault();
     try {
       setError(null);
-      await post('/sales/invoices', invoiceForm);
+      // Sanitize: convert empty strings to null for optional UUID fields
+      // so they pass Zod's .uuid().nullish() validation on the server
+      const payload = {
+        ...invoiceForm,
+        warehouseId: invoiceForm.warehouseId || null,
+        dueDate: invoiceForm.dueDate || null,
+        notes: invoiceForm.notes || null,
+        items: invoiceForm.items.map((item) => ({
+          ...item,
+          itemId: item.itemId || null,
+        })),
+      };
+      await post('/sales/invoices', payload);
       setSuccess('Sales invoice created and posted successfully');
       setShowInvoiceModal(false);
       loadData();

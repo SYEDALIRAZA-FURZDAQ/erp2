@@ -368,7 +368,7 @@ accountingRouter.post(
       if (!ok) throw badRequest('Invalid owner password. Reversal authorization failed.');
 
       const jvRes = await db.query(
-        'SELECT id, entry_number, voucher_type, is_posted FROM journal_entries WHERE id = $1',
+        'SELECT id, entry_number, voucher_type, reference, narration, is_posted FROM journal_entries WHERE id = $1',
         [req.params.id],
       );
       const jv = jvRes.rows[0];
@@ -383,6 +383,39 @@ accountingRouter.post(
         [req.params.id, userId, reason],
       );
 
+      // Synchronize source documents:
+      // 1. If this voucher is linked to a sales invoice, cancel the invoice and restore deducted inventory
+      const ref = jv.reference;
+      const narr = jv.narration || '';
+      const invRes = await db.query(
+        `SELECT id, invoice_number FROM sales_invoices
+          WHERE (invoice_number = $1 AND $1 IS NOT NULL)
+             OR ($2 != '' AND $2 LIKE '%' || invoice_number || '%')`,
+        [ref, narr],
+      );
+      for (const inv of invRes.rows) {
+        await db.query(`UPDATE sales_invoices SET status = 'cancelled' WHERE id = $1`, [inv.id]);
+        await db.query(
+          `DELETE FROM stock_movements WHERE reference = $1 AND notes = 'Sales Invoice Sale'`,
+          [inv.invoice_number],
+        );
+      }
+
+      // 2. If this voucher is linked to a purchase bill, cancel the bill and restore received inventory
+      const billRes = await db.query(
+        `SELECT id, bill_number FROM purchase_bills
+          WHERE (bill_number = $1 AND $1 IS NOT NULL)
+             OR ($2 != '' AND $2 LIKE '%' || bill_number || '%')`,
+        [ref, narr],
+      );
+      for (const bill of billRes.rows) {
+        await db.query(`UPDATE purchase_bills SET status = 'cancelled' WHERE id = $1`, [bill.id]);
+        await db.query(
+          `DELETE FROM stock_movements WHERE reference = $1 AND notes = 'Purchase Goods Receipt'`,
+          [bill.bill_number],
+        );
+      }
+
       await writeAudit(db, {
         tenantId,
         userId,
@@ -395,7 +428,7 @@ accountingRouter.post(
 
       return {
         success: true,
-        message: `Journal voucher ${jv.entry_number} reversed successfully.`,
+        message: `Journal voucher ${jv.entry_number} reversed successfully. Linked invoice/bill status synchronized.`,
       };
     });
 

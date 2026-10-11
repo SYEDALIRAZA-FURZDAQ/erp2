@@ -33,7 +33,7 @@ salesRouter.get(
       const rows = await db.query(
         `SELECT c.id, c.name, c.ntn, c.strn, c.cnic, c.phone, c.email, c.address, c.city,
                 c.buyer_type AS "buyerType", c.created_at AS "createdAt",
-                COALESCE(SUM(si.grand_total), 0)::numeric(14,2) AS "totalSales"
+                COALESCE(SUM(CASE WHEN si.status != 'cancelled' THEN si.grand_total ELSE 0 END), 0)::numeric(14,2) AS "totalSales"
            FROM customers c
            LEFT JOIN sales_invoices si ON si.customer_id = c.id
           GROUP BY c.id
@@ -406,8 +406,24 @@ salesRouter.post(
     const tenantId = req.auth!.tenantId;
 
     await withTenant(tenantId, async (db) => {
-      const r = await db.query('UPDATE sales_invoices SET status = $1 WHERE id = $2 RETURNING id', [status, req.params.id]);
+      const r = await db.query('UPDATE sales_invoices SET status = $1 WHERE id = $2 RETURNING id, invoice_number', [status, req.params.id]);
       if (!r.rowCount) throw notFound('Invoice not found');
+
+      if (status === 'cancelled') {
+        const invNum = r.rows[0].invoice_number;
+        // Unpost / void linked journal entries
+        await db.query(
+          `UPDATE journal_entries
+              SET is_posted = false, reversed_at = now(), reversal_reason = 'Sales invoice cancelled'
+            WHERE (reference = $1 OR narration LIKE '%' || $1 || '%') AND is_posted = true`,
+          [invNum],
+        );
+        // Revert inventory stock deductions
+        await db.query(
+          `DELETE FROM stock_movements WHERE reference = $1 AND notes = 'Sales Invoice Sale'`,
+          [invNum],
+        );
+      }
 
       await writeAudit(db, {
         tenantId,

@@ -250,3 +250,56 @@ projectsRouter.post(
     res.status(201).json(out);
   }),
 );
+
+// -------------------------------------------------------------
+// 4. Delete Project (cascades tasks + timesheets)
+// Confirmation is enforced on the frontend (type DELETE).
+// -------------------------------------------------------------
+projectsRouter.delete(
+  '/:id',
+  requirePermission('projects.manage.manage'),
+  asyncHandler(async (req, res) => {
+    const tenantId = req.auth!.tenantId;
+
+    const out = await withTenant(tenantId, async (db) => {
+      const prjRes = await db.query(
+        `SELECT id, code, name FROM projects WHERE id = $1`,
+        [req.params.id]
+      );
+      const project = prjRes.rows[0];
+      if (!project) throw notFound('Project not found');
+
+      // Count child records for audit trail
+      const taskRes = await db.query('SELECT count(*)::int AS n FROM project_tasks WHERE project_id = $1', [req.params.id]);
+      const tsRes   = await db.query('SELECT count(*)::int AS n FROM project_timesheets WHERE project_id = $1', [req.params.id]);
+
+      // Cascade delete (timesheets → tasks → project)
+      await db.query('DELETE FROM project_timesheets WHERE project_id = $1', [req.params.id]);
+      await db.query('DELETE FROM project_tasks WHERE project_id = $1', [req.params.id]);
+      await db.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'project.delete',
+        entity: 'project',
+        entityId: req.params.id,
+        newValue: {
+          code: project.code,
+          name: project.name,
+          tasksDeleted: taskRes.rows[0].n,
+          timesheetsDeleted: tsRes.rows[0].n,
+        },
+        ip: clientIp(req),
+      });
+
+      return {
+        success: true,
+        message: `Project '${project.name}' (${project.code}) deleted along with ${taskRes.rows[0].n} task(s) and ${tsRes.rows[0].n} timesheet entry(ies).`,
+      };
+    });
+
+    res.json(out);
+  }),
+);
+

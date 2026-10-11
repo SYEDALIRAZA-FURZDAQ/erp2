@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, post } from '../lib/api';
+import { api, del, post } from '../lib/api';
 import { useTranslation } from '../lib/i18n';
 import { ErrorBox, Modal, PageHeader, StatCard, StatusBadge, SuccessBox } from '../components/ui';
+import { useAuth } from '../lib/auth';
 
 interface FixedAsset {
   id: string;
@@ -21,6 +22,9 @@ interface FixedAsset {
 
 export default function FixedAssetsPage() {
   const { t } = useTranslation();
+  const { session } = useAuth();
+  const isOwner = session?.user?.isOwner ?? false;
+
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,11 @@ export default function FixedAssetsPage() {
     usefulLifeYears: 4,
     location: 'Head Office',
   });
+
+  // Delete Asset State (password-protected)
+  const [deletingAsset, setDeletingAsset] = useState<FixedAsset | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const loadAssets = async () => {
     try {
@@ -74,6 +83,26 @@ export default function FixedAssetsPage() {
       loadAssets();
     } catch (e: any) {
       setError(e.message);
+    }
+  };
+
+  const handleDeleteAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingAsset) return;
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      const res = await del<{ success: boolean; message: string }>(`/assets/${deletingAsset.id}`, {
+        password: deletePassword,
+      });
+      setSuccess(res.message);
+      setDeletingAsset(null);
+      setDeletePassword('');
+      loadAssets();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -146,6 +175,9 @@ export default function FixedAssetsPage() {
                 </td>
                 <td className="td text-right font-mono text-rose-600">
                   {Number(a.accumulatedDepreciation).toLocaleString('en-PK')}
+                  {a.depreciationCount > 0 && (
+                    <div className="text-[10px] text-slate-400">{a.depreciationCount} run(s)</div>
+                  )}
                 </td>
                 <td className="td text-right font-mono font-bold text-emerald-800">
                   PKR {Number(a.currentValue).toLocaleString('en-PK')}
@@ -154,12 +186,23 @@ export default function FixedAssetsPage() {
                   <StatusBadge status={a.status} />
                 </td>
                 <td className="td text-right">
-                  <button
-                    className="btn bg-indigo-600 hover:bg-indigo-700 text-xs py-1 px-2.5"
-                    onClick={() => handleRunDepreciation(a.id)}
-                  >
-                    {t('assets.run_depreciation', 'Run Depreciation')}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      className="btn bg-indigo-600 hover:bg-indigo-700 text-xs py-1 px-2.5"
+                      onClick={() => handleRunDepreciation(a.id)}
+                    >
+                      {t('assets.run_depreciation', 'Run Depreciation')}
+                    </button>
+                    {isOwner && (
+                      <button
+                        className="btn-ghost text-xs py-1 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        title="Delete asset (owner only)"
+                        onClick={() => { setDeletingAsset(a); setDeletePassword(''); }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -197,10 +240,10 @@ export default function FixedAssetsPage() {
                   value={assetForm.category}
                   onChange={(e) => setAssetForm({ ...assetForm, category: e.target.value })}
                 >
-                  <option value="it_equipment">IT & Electronics Equipment</option>
+                  <option value="it_equipment">IT &amp; Electronics Equipment</option>
                   <option value="vehicles">Motor Vehicles</option>
-                  <option value="machinery">Plant & Machinery</option>
-                  <option value="furniture">Furniture & Fixtures</option>
+                  <option value="machinery">Plant &amp; Machinery</option>
+                  <option value="furniture">Furniture &amp; Fixtures</option>
                   <option value="building">Office Building</option>
                   <option value="other">Other Asset</option>
                 </select>
@@ -266,6 +309,93 @@ export default function FixedAssetsPage() {
               </button>
               <button type="submit" className="btn">
                 Save Asset
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* MODAL: Delete Fixed Asset (Owner Password-Protected) */}
+      {deletingAsset && (
+        <Modal
+          title={`Delete Fixed Asset: ${deletingAsset.assetCode}`}
+          onClose={() => { if (!deleteLoading) { setDeletingAsset(null); setDeletePassword(''); } }}
+        >
+          <form onSubmit={handleDeleteAsset} className="space-y-4 text-xs">
+            {/* Danger warning */}
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-rose-800 space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-rose-900 text-sm">
+                ⚠️ Financial Records Deletion Notice
+              </p>
+              <p>Permanently deletes this fixed asset from the register along with:</p>
+              <ul className="list-disc list-inside space-y-0.5 pl-1">
+                <li>All <strong>{deletingAsset.depreciationCount} depreciation run(s)</strong> logged for this asset</li>
+                <li>All linked <strong>accounting journal entries</strong> posted to the General Ledger</li>
+              </ul>
+              <p className="font-semibold text-rose-950 pt-1">This action is permanent and cannot be undone.</p>
+            </div>
+
+            {/* Asset summary */}
+            <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                    {deletingAsset.assetCode}
+                  </span>
+                  <p className="font-semibold text-slate-800 mt-1.5">{deletingAsset.name}</p>
+                  <p className="text-slate-500 uppercase tracking-wide mt-0.5">{deletingAsset.category.replace(/_/g, ' ')}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-500">Purchase Cost:</p>
+                  <p className="font-mono font-bold text-slate-900">PKR {Number(deletingAsset.purchaseCost).toLocaleString('en-PK')}</p>
+                  <p className="text-slate-500 mt-1">Accumulated Depr.:</p>
+                  <p className="font-mono font-semibold text-rose-600">PKR {Number(deletingAsset.accumulatedDepreciation).toLocaleString('en-PK')}</p>
+                  <p className="text-slate-500 mt-1">Book Value:</p>
+                  <p className="font-mono font-bold text-emerald-700">PKR {Number(deletingAsset.currentValue).toLocaleString('en-PK')}</p>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 pt-2 flex justify-between">
+                <StatusBadge status={deletingAsset.status} />
+                <span className="text-slate-400">{deletingAsset.depreciationCount} depreciation run(s)</span>
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="label text-xs font-semibold text-slate-800">
+                Owner Account Password *
+              </label>
+              <input
+                id="delete-asset-password"
+                type="password"
+                required
+                className="input"
+                placeholder="Enter owner password to authorize deletion..."
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoFocus
+                autoComplete="current-password"
+              />
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Company owner authentication is required to delete fixed asset records.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={deleteLoading}
+                onClick={() => { setDeletingAsset(null); setDeletePassword(''); }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn bg-rose-600 hover:bg-rose-700 text-xs py-2 px-4 shadow-sm font-medium"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Verifying & Deleting…' : '🗑️ Delete Asset & All Depreciation'}
               </button>
             </div>
           </form>

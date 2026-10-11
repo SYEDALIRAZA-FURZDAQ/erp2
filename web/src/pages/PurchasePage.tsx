@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, post } from '../lib/api';
+import { api, del, post, put } from '../lib/api';
 import { useTranslation } from '../lib/i18n';
 import { ErrorBox, Modal, PageHeader, StatusBadge, SuccessBox } from '../components/ui';
+import { useAuth } from '../lib/auth';
 
 interface Vendor {
   id: string;
@@ -44,6 +45,8 @@ interface Warehouse {
 
 export default function PurchasePage() {
   const { t } = useTranslation();
+  const { session } = useAuth();
+  const isOwner = session?.user?.isOwner ?? false;
   const [tab, setTab] = useState<'bills' | 'vendors'>('bills');
   const [bills, setBills] = useState<PurchaseBill[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -58,6 +61,26 @@ export default function PurchasePage() {
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any | null>(null);
+
+  // Delete Bill State (password-protected)
+  const [deletingBill, setDeletingBill] = useState<PurchaseBill | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Edit / Delete Vendor State
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [deletingVendor, setDeletingVendor] = useState<Vendor | null>(null);
+  const [editVendorForm, setEditVendorForm] = useState({
+    name: '',
+    ntn: '',
+    strn: '',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    paymentTerms: 'Net 30',
+  });
 
   // New Vendor Form
   const [vendorForm, setVendorForm] = useState({
@@ -136,13 +159,76 @@ export default function PurchasePage() {
     }
   };
 
+  const openEditVendorModal = (v: Vendor) => {
+    setEditingVendor(v);
+    setEditVendorForm({
+      name: v.name,
+      ntn: v.ntn || '',
+      strn: v.strn || '',
+      contactPerson: v.contactPerson || '',
+      phone: v.phone || '',
+      email: v.email || '',
+      address: v.address || '',
+      city: v.city || '',
+      paymentTerms: v.paymentTerms || 'Net 30',
+    });
+  };
+
+  const handleUpdateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor) return;
+    try {
+      setError(null);
+      await put(`/purchase/vendors/${editingVendor.id}`, editVendorForm);
+      setSuccess('Supplier / Vendor updated successfully');
+      setEditingVendor(null);
+      loadData();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const handleDeleteVendor = async () => {
+    if (!deletingVendor) return;
+    try {
+      setError(null);
+      await del(`/purchase/vendors/${deletingVendor.id}`);
+      setSuccess('Supplier / Vendor removed successfully');
+      setDeletingVendor(null);
+      loadData();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   const handleCreateBill = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setError(null);
-      await post('/purchase/bills', billForm);
+      const payload = {
+        ...billForm,
+        warehouseId: billForm.warehouseId?.trim() ? billForm.warehouseId : null,
+        dueDate: billForm.dueDate?.trim() ? billForm.dueDate : null,
+        notes: billForm.notes?.trim() ? billForm.notes : null,
+        items: billForm.items.map((it) => ({
+          ...it,
+          itemId: it.itemId?.trim() ? it.itemId : null,
+          quantity: Number(it.quantity) || 1,
+          unitCost: Number(it.unitCost) || 0,
+          taxRate: Number(it.taxRate) || 0,
+        })),
+      };
+      await post('/purchase/bills', payload);
       setSuccess('Purchase bill created and stock received successfully');
       setShowBillModal(false);
+      setBillForm({
+        vendorId: vendors[0]?.id || '',
+        warehouseId: warehouses[0]?.id || '',
+        billDate: new Date().toISOString().slice(0, 10),
+        dueDate: '',
+        notes: '',
+        items: [{ itemId: '', description: '', quantity: 1, unitCost: 0, taxRate: 0 }],
+      });
       loadData();
     } catch (e: any) {
       setError(e.message);
@@ -155,6 +241,27 @@ export default function PurchasePage() {
       setSelectedBill(b);
     } catch (e: any) {
       setError(e.message);
+    }
+  };
+
+  const handleDeleteBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingBill) return;
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      const res = await del<{ success: boolean; message: string }>(`/purchase/bills/${deletingBill.id}`, {
+        password: deletePassword,
+      });
+      setSuccess(res.message);
+      if (selectedBill?.id === deletingBill.id) setSelectedBill(null);
+      setDeletingBill(null);
+      setDeletePassword('');
+      loadData();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -282,6 +389,15 @@ export default function PurchasePage() {
                         {t('purchase.mark_paid', 'Mark Paid')}
                       </button>
                     )}
+                    {isOwner && (
+                      <button
+                        className="btn-ghost text-xs py-1 px-2.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        onClick={() => { setDeletingBill(b); setDeletePassword(''); }}
+                        title="Delete bill (owner only)"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -310,6 +426,7 @@ export default function PurchasePage() {
                 <th className="th">{t('purchase.city', 'City')}</th>
                 <th className="th">{t('purchase.payment_terms', 'Payment Terms')}</th>
                 <th className="th text-right">{t('purchase.total_purchases', 'Total Purchases')}</th>
+                <th className="th text-right">{t('common.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -334,11 +451,25 @@ export default function PurchasePage() {
                   <td className="td text-right font-mono font-bold text-slate-900">
                     PKR {Number(v.totalBilled).toLocaleString('en-PK', { minimumFractionDigits: 2 })}
                   </td>
+                  <td className="td text-right space-x-2">
+                    <button
+                      className="btn-ghost text-xs py-1 px-2.5"
+                      onClick={() => openEditVendorModal(v)}
+                    >
+                      {t('common.edit', 'Edit')}
+                    </button>
+                    <button
+                      className="btn-ghost text-xs py-1 px-2.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      onClick={() => setDeletingVendor(v)}
+                    >
+                      {t('common.delete', 'Remove')}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {vendors.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={8} className="p-8 text-center text-slate-500">
                     {t('common.no_records', 'No suppliers found. Add your first vendor.')}
                   </td>
                 </tr>
@@ -445,7 +576,7 @@ export default function PurchasePage() {
       {showBillModal && (
         <Modal title="Create Purchase Bill" maxWidth="max-w-3xl" onClose={() => setShowBillModal(false)}>
           <form onSubmit={handleCreateBill} className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="label">Supplier / Vendor</label>
                 <select
@@ -470,6 +601,15 @@ export default function PurchasePage() {
                   required
                   value={billForm.billDate}
                   onChange={(e) => setBillForm({ ...billForm, billDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Due Date (Optional)</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={billForm.dueDate}
+                  onChange={(e) => setBillForm({ ...billForm, dueDate: e.target.value })}
                 />
               </div>
               <div>
@@ -577,6 +717,18 @@ export default function PurchasePage() {
                 ))}
               </div>
 
+              {/* Notes */}
+              <div className="mt-4">
+                <label className="label">Notes / Reference (Optional)</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Purchase order PO-2024-001, delivered via courier"
+                  value={billForm.notes}
+                  onChange={(e) => setBillForm({ ...billForm, notes: e.target.value })}
+                />
+              </div>
+
               {/* Totals Box */}
               <div className="mt-4 rounded-lg bg-slate-50 p-4 flex justify-between items-center text-sm">
                 <div>
@@ -599,6 +751,148 @@ export default function PurchasePage() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* MODAL: Edit Vendor */}
+      {editingVendor && (
+        <Modal title="Edit Supplier / Vendor" onClose={() => setEditingVendor(null)}>
+          <form onSubmit={handleUpdateVendor} className="space-y-4">
+            <div>
+              <label className="label">Company / Vendor Name</label>
+              <input
+                type="text"
+                className="input"
+                required
+                value={editVendorForm.name}
+                onChange={(e) => setEditVendorForm({ ...editVendorForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">NTN</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. 4912384-5"
+                  value={editVendorForm.ntn}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, ntn: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">STRN</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. 1700491238411"
+                  value={editVendorForm.strn}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, strn: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Contact Person</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Kamran Sheikh"
+                  value={editVendorForm.contactPerson}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, contactPerson: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Payment Terms</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Net 30"
+                  value={editVendorForm.paymentTerms}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, paymentTerms: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Phone</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="+92-42-35789012"
+                  value={editVendorForm.phone}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="vendor@example.com"
+                  value={editVendorForm.email}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">City</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Lahore"
+                  value={editVendorForm.city}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, city: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Address</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Plot 12, Industrial Area"
+                  value={editVendorForm.address}
+                  onChange={(e) => setEditVendorForm({ ...editVendorForm, address: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setEditingVendor(null)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn">
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* MODAL: Delete Vendor Confirmation */}
+      {deletingVendor && (
+        <Modal title="Remove Supplier / Vendor" onClose={() => setDeletingVendor(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              Are you sure you want to remove vendor <strong className="text-slate-900">{deletingVendor.name}</strong>?
+            </p>
+            {Number(deletingVendor.totalBilled) > 0 && (
+              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200">
+                <strong>Notice:</strong> This vendor has PKR {Number(deletingVendor.totalBilled).toLocaleString('en-PK', { minimumFractionDigits: 2 })} in recorded purchase bills. Vendors with existing bills cannot be deleted to preserve financial audit history.
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" className="btn-ghost" onClick={() => setDeletingVendor(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn bg-rose-600 hover:bg-rose-700 text-white"
+                onClick={handleDeleteVendor}
+              >
+                Confirm Remove
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
@@ -644,6 +938,85 @@ export default function PurchasePage() {
               <span className="font-mono text-indigo-700">PKR {Number(selectedBill.grandTotal).toFixed(2)}</span>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Delete Purchase Bill (Owner Password-Protected) */}
+      {deletingBill && (
+        <Modal
+          title={`Delete Purchase Bill: ${deletingBill.billNumber}`}
+          onClose={() => { if (!deleteLoading) { setDeletingBill(null); setDeletePassword(''); } }}
+        >
+          <form onSubmit={handleDeleteBill} className="space-y-4 text-xs">
+            {/* Danger warning */}
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-rose-800 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-rose-900">
+                ⚠️ Financial Records Deletion Notice
+              </p>
+              <p>
+                Deleting this purchase bill will permanently remove the bill, all its line items,
+                and any linked accounting journal vouchers from the General Ledger.
+              </p>
+              <p className="font-semibold text-rose-950 mt-1">
+                All stock movements received from this bill will be reversed automatically.
+              </p>
+            </div>
+
+            {/* Bill summary */}
+            <div className="bg-slate-50 p-2.5 rounded border border-slate-200 flex justify-between items-center">
+              <div>
+                <span className="text-slate-500">Supplier:</span>
+                <p className="font-semibold text-slate-800">{deletingBill.vendorName}</p>
+                <p className="text-slate-500 mt-0.5">Date: {deletingBill.billDate}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500">Grand Total:</span>
+                <p className="font-mono font-bold text-slate-900 text-sm">
+                  PKR {Number(deletingBill.grandTotal).toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                </p>
+                <StatusBadge status={deletingBill.status} />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="label text-xs font-semibold text-slate-800">
+                Owner Account Password *
+              </label>
+              <input
+                id="delete-bill-password"
+                type="password"
+                required
+                className="input"
+                placeholder="Enter owner password to authorize deletion..."
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoFocus
+                autoComplete="current-password"
+              />
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Company owner authentication is required to delete financial records.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={deleteLoading}
+                onClick={() => { setDeletingBill(null); setDeletePassword(''); }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn bg-rose-600 hover:bg-rose-700 text-xs py-2 px-4 shadow-sm font-medium"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Verifying & Deleting…' : '🗑️ Confirm Delete Bill'}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, clientIp, requirePermission } from '../../middleware/auth';
 import { withTenant } from '../../db/pool';
-import { asyncHandler, badRequest } from '../../utils/errors';
+import { asyncHandler, badRequest, forbidden, notFound } from '../../utils/errors';
 import { writeAudit } from '../audit/audit.service';
+import { verifyPassword } from '../../utils/password';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(authenticate);
@@ -89,6 +90,134 @@ inventoryRouter.post(
     });
 
     res.status(201).json(out);
+  }),
+);
+
+// -------------------------------------------------------------
+// 1b. Update Item
+// -------------------------------------------------------------
+const itemUpdateSchema = z.object({
+  sku: z.string().trim().min(2).max(50).optional(),
+  name: z.string().trim().min(2).max(150).optional(),
+  category: z.string().trim().max(50).nullish(),
+  uom: z.string().trim().min(1).max(20).optional(),
+  costPrice: z.coerce.number().min(0).optional(),
+  sellingPrice: z.coerce.number().min(0).optional(),
+  taxRate: z.coerce.number().min(0).optional(),
+  reorderLevel: z.coerce.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+inventoryRouter.put(
+  '/items/:id',
+  requirePermission('inventory.items.manage'),
+  asyncHandler(async (req, res) => {
+    const input = itemUpdateSchema.parse(req.body);
+    const tenantId = req.auth!.tenantId;
+    const itemId = req.params.id;
+
+    const out = await withTenant(tenantId, async (db) => {
+      // Check item exists
+      const existing = await db.query('SELECT id, sku FROM items WHERE id = $1', [itemId]);
+      if (!existing.rows[0]) throw notFound('Item not found');
+
+      // Check SKU uniqueness if changing SKU
+      if (input.sku && input.sku !== existing.rows[0].sku) {
+        const dup = await db.query('SELECT 1 FROM items WHERE sku = $1 AND id != $2', [input.sku, itemId]);
+        if (dup.rowCount) throw badRequest(`Item SKU '${input.sku}' already exists`);
+      }
+
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+      let idx = 1;
+
+      const fieldMap: Record<string, string> = {
+        sku: 'sku', name: 'name', category: 'category', uom: 'uom',
+        costPrice: 'cost_price', sellingPrice: 'selling_price',
+        taxRate: 'tax_rate', reorderLevel: 'reorder_level', isActive: 'is_active',
+      };
+
+      for (const [key, col] of Object.entries(fieldMap)) {
+        if ((input as any)[key] !== undefined) {
+          setClauses.push(`${col} = $${idx}`);
+          values.push((input as any)[key] ?? null);
+          idx++;
+        }
+      }
+
+      if (setClauses.length === 0) throw badRequest('No fields to update');
+
+      values.push(itemId);
+      const r = await db.query(
+        `UPDATE items SET ${setClauses.join(', ')}
+         WHERE id = $${idx}
+         RETURNING id, sku, name, category, uom, cost_price AS "costPrice",
+                   selling_price AS "sellingPrice", tax_rate AS "taxRate",
+                   reorder_level AS "reorderLevel", is_active AS "isActive"`,
+        values
+      );
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'item.update',
+        entity: 'item',
+        entityId: itemId,
+        newValue: input,
+        ip: clientIp(req),
+      });
+
+      return r.rows[0];
+    });
+
+    res.json(out);
+  }),
+);
+
+// -------------------------------------------------------------
+// 1c. Delete Item
+// -------------------------------------------------------------
+inventoryRouter.delete(
+  '/items/:id',
+  requirePermission('inventory.items.manage'),
+  asyncHandler(async (req, res) => {
+    const tenantId = req.auth!.tenantId;
+    const itemId = req.params.id;
+
+    await withTenant(tenantId, async (db) => {
+      const existing = await db.query('SELECT id, sku, name FROM items WHERE id = $1', [itemId]);
+      if (!existing.rows[0]) throw notFound('Item not found');
+
+      // Check if item has stock movements
+      const movements = await db.query('SELECT count(*)::int AS n FROM stock_movements WHERE item_id = $1', [itemId]);
+      if (movements.rows[0].n > 0) {
+        throw badRequest(
+          `Cannot delete item '${existing.rows[0].name}' because it has ${movements.rows[0].n} stock movement(s). Deactivate it instead.`
+        );
+      }
+
+      // Check if item is referenced in sales/purchase invoices
+      const salesRef = await db.query('SELECT count(*)::int AS n FROM sales_invoice_items WHERE item_id = $1', [itemId]);
+      if (salesRef.rows[0]?.n > 0) {
+        throw badRequest(
+          `Cannot delete item '${existing.rows[0].name}' because it is referenced in ${salesRef.rows[0].n} sales invoice(s). Deactivate it instead.`
+        );
+      }
+
+      await db.query('DELETE FROM items WHERE id = $1', [itemId]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'item.delete',
+        entity: 'item',
+        entityId: itemId,
+        newValue: { sku: existing.rows[0].sku, name: existing.rows[0].name },
+        ip: clientIp(req),
+      });
+    });
+
+    res.json({ success: true });
   }),
 );
 
@@ -234,3 +363,80 @@ inventoryRouter.post(
     res.status(201).json(out);
   }),
 );
+
+// -------------------------------------------------------------
+// 2b. Delete Warehouse (owner password-protected)
+// -------------------------------------------------------------
+inventoryRouter.delete(
+  '/warehouses/:id',
+  requirePermission('inventory.warehouses.manage'),
+  asyncHandler(async (req, res) => {
+    const { isOwner, userId, tenantId } = req.auth!;
+    if (!isOwner) throw forbidden('Access denied. Only the company owner can delete warehouses.');
+
+    const { password } = z.object({
+      password: z.string().min(1, 'Owner password is required to authorize warehouse deletion'),
+    }).parse(req.body);
+
+    const out = await withTenant(tenantId, async (db) => {
+      // Verify owner password
+      const userRes = await db.query('SELECT password_hash, is_owner FROM users WHERE id = $1', [userId]);
+      const user = userRes.rows[0];
+      if (!user?.is_owner) throw forbidden('Owner account required');
+
+      const ok = await verifyPassword(password, user.password_hash);
+      if (!ok) throw badRequest('Invalid owner password. Deletion authorization failed.');
+
+      // Fetch the warehouse
+      const whRes = await db.query(
+        'SELECT id, code, name FROM warehouses WHERE id = $1',
+        [req.params.id]
+      );
+      const wh = whRes.rows[0];
+      if (!wh) throw notFound('Warehouse not found');
+
+      // Block deletion if it has any stock movement history
+      const movRes = await db.query(
+        'SELECT count(*)::int AS n FROM stock_movements WHERE warehouse_id = $1',
+        [req.params.id]
+      );
+      if (movRes.rows[0].n > 0) {
+        throw badRequest(
+          `Cannot delete warehouse '${wh.name}' because it has ${movRes.rows[0].n} stock movement record(s). ` +
+          `Delete or reassign all stock movements first, or deactivate the warehouse instead.`
+        );
+      }
+
+      // Block deletion if referenced in purchase bills
+      const billRes = await db.query(
+        'SELECT count(*)::int AS n FROM purchase_bills WHERE warehouse_id = $1',
+        [req.params.id]
+      );
+      if (billRes.rows[0].n > 0) {
+        throw badRequest(
+          `Cannot delete warehouse '${wh.name}' because it is referenced in ${billRes.rows[0].n} purchase bill(s).`
+        );
+      }
+
+      await db.query('DELETE FROM warehouses WHERE id = $1', [req.params.id]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId,
+        action: 'warehouse.delete',
+        entity: 'warehouse',
+        entityId: req.params.id,
+        newValue: { code: wh.code, name: wh.name },
+        ip: clientIp(req),
+      });
+
+      return {
+        success: true,
+        message: `Warehouse '${wh.name}' (${wh.code}) has been permanently deleted.`,
+      };
+    });
+
+    res.json(out);
+  }),
+);
+

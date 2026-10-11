@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, clientIp, requirePermission } from '../../middleware/auth';
 import { withTenant } from '../../db/pool';
-import { asyncHandler, badRequest, notFound } from '../../utils/errors';
+import { asyncHandler, badRequest, forbidden, notFound } from '../../utils/errors';
 import { writeAudit } from '../audit/audit.service';
 import { nextDocNumber } from '../numbering/numbering.service';
+import { verifyPassword } from '../../utils/password';
 
 export const purchaseRouter = Router();
 purchaseRouter.use(authenticate);
@@ -90,10 +91,127 @@ purchaseRouter.post(
 );
 
 // -------------------------------------------------------------
+// 1b. Update Vendor
+// -------------------------------------------------------------
+const vendorUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(150).optional(),
+  ntn: z.string().trim().max(30).nullish(),
+  strn: z.string().trim().max(30).nullish(),
+  contactPerson: z.string().trim().max(100).nullish(),
+  phone: z.string().trim().max(30).nullish(),
+  email: z.string().trim().email().nullish().or(z.literal('')),
+  address: z.string().trim().max(300).nullish(),
+  city: z.string().trim().max(50).nullish(),
+  paymentTerms: z.string().trim().max(50).nullish(),
+});
+
+purchaseRouter.put(
+  '/vendors/:id',
+  requirePermission('purchase.vendors.manage'),
+  asyncHandler(async (req, res) => {
+    const input = vendorUpdateSchema.parse(req.body);
+    const tenantId = req.auth!.tenantId;
+    const vendorId = req.params.id;
+
+    const out = await withTenant(tenantId, async (db) => {
+      const existing = await db.query('SELECT id, name FROM vendors WHERE id = $1', [vendorId]);
+      if (!existing.rows[0]) throw notFound('Supplier / Vendor not found');
+
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+      let idx = 1;
+
+      const fieldMap: Record<string, string> = {
+        name: 'name',
+        ntn: 'ntn',
+        strn: 'strn',
+        contactPerson: 'contact_person',
+        phone: 'phone',
+        email: 'email',
+        address: 'address',
+        city: 'city',
+        paymentTerms: 'payment_terms',
+      };
+
+      for (const [key, col] of Object.entries(fieldMap)) {
+        if ((input as any)[key] !== undefined) {
+          setClauses.push(`${col} = $${idx}`);
+          values.push((input as any)[key] || null);
+          idx++;
+        }
+      }
+
+      if (setClauses.length === 0) throw badRequest('No fields to update');
+
+      values.push(vendorId);
+      const r = await db.query(
+        `UPDATE vendors SET ${setClauses.join(', ')}
+         WHERE id = $${idx}
+         RETURNING id, name, ntn, strn, contact_person AS "contactPerson",
+                   phone, email, address, city, payment_terms AS "paymentTerms"`,
+        values
+      );
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'vendor.update',
+        entity: 'vendor',
+        entityId: vendorId,
+        newValue: input,
+        ip: clientIp(req),
+      });
+
+      return r.rows[0];
+    });
+
+    res.json(out);
+  }),
+);
+
+// -------------------------------------------------------------
+// 1c. Delete Vendor
+// -------------------------------------------------------------
+purchaseRouter.delete(
+  '/vendors/:id',
+  requirePermission('purchase.vendors.manage'),
+  asyncHandler(async (req, res) => {
+    const tenantId = req.auth!.tenantId;
+    const vendorId = req.params.id;
+
+    await withTenant(tenantId, async (db) => {
+      const existing = await db.query('SELECT id, name FROM vendors WHERE id = $1', [vendorId]);
+      if (!existing.rows[0]) throw notFound('Supplier / Vendor not found');
+
+      const bills = await db.query('SELECT count(*)::int AS n FROM purchase_bills WHERE vendor_id = $1', [vendorId]);
+      if (bills.rows[0].n > 0) {
+        throw badRequest(
+          `Cannot delete vendor '${existing.rows[0].name}' because they have ${bills.rows[0].n} purchase bill(s) recorded against them.`
+        );
+      }
+
+      await db.query('DELETE FROM vendors WHERE id = $1', [vendorId]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'vendor.delete',
+        entity: 'vendor',
+        entityId: vendorId,
+        newValue: { name: existing.rows[0].name },
+        ip: clientIp(req),
+      });
+    });
+
+    res.json({ success: true, message: 'Vendor removed successfully' });
+  }),
+);
+
+// -------------------------------------------------------------
 // 2. Purchase Bills / Invoices
 // -------------------------------------------------------------
 const billItemSchema = z.object({
-  itemId: z.string().uuid().nullish(),
+  itemId: z.string().uuid().nullish().or(z.literal('')),
   description: z.string().trim().min(1).max(255),
   quantity: z.coerce.number().positive(),
   unitCost: z.coerce.number().min(0),
@@ -102,10 +220,10 @@ const billItemSchema = z.object({
 
 const billCreateSchema = z.object({
   vendorId: z.string().uuid(),
-  warehouseId: z.string().uuid().nullish(),
+  warehouseId: z.string().uuid().nullish().or(z.literal('')),
   billDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(() => new Date().toISOString().slice(0, 10)),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
-  notes: z.string().trim().max(500).nullish(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal('')),
+  notes: z.string().trim().max(500).nullish().or(z.literal('')),
   items: z.array(billItemSchema).min(1, 'Bill must have at least 1 item'),
 });
 
@@ -180,15 +298,20 @@ purchaseRouter.post(
     const input = billCreateSchema.parse(req.body);
     const tenantId = req.auth!.tenantId;
 
+    const cleanWarehouseId = input.warehouseId && input.warehouseId.trim() !== '' ? input.warehouseId : null;
+    const cleanDueDate = input.dueDate && input.dueDate.trim() !== '' ? input.dueDate : null;
+    const cleanNotes = input.notes && input.notes.trim() !== '' ? input.notes : null;
+
     let subtotal = 0;
     let totalTax = 0;
     const computedItems = input.items.map((item) => {
+      const cleanItemId = item.itemId && item.itemId.trim() !== '' ? item.itemId : null;
       const lineSubtotal = item.quantity * item.unitCost;
       const lineTax = (lineSubtotal * item.taxRate) / 100;
       const lineTotal = lineSubtotal + lineTax;
       subtotal += lineSubtotal;
       totalTax += lineTax;
-      return { ...item, lineTax, lineTotal };
+      return { ...item, itemId: cleanItemId, lineTax, lineTotal };
     });
 
     const grandTotal = subtotal + totalTax;
@@ -211,13 +334,13 @@ purchaseRouter.post(
           tenantId,
           billNumber,
           input.vendorId,
-          input.warehouseId ?? null,
+          cleanWarehouseId,
           input.billDate,
-          input.dueDate ?? null,
+          cleanDueDate,
           subtotal.toFixed(2),
           totalTax.toFixed(2),
           grandTotal.toFixed(2),
-          input.notes ?? null,
+          cleanNotes,
         ]
       );
       const billId = bill.rows[0].id;
@@ -241,11 +364,11 @@ purchaseRouter.post(
         );
 
         // Auto add stock into warehouse
-        if (item.itemId && input.warehouseId) {
+        if (item.itemId && cleanWarehouseId) {
           await db.query(
             `INSERT INTO stock_movements (tenant_id, item_id, warehouse_id, movement_type, quantity, unit_cost, reference, notes)
              VALUES ($1, $2, $3, 'in', $4, $5, $6, 'Purchase Goods Receipt')`,
-            [tenantId, item.itemId, input.warehouseId, item.quantity, item.unitCost, billNumber]
+            [tenantId, item.itemId, cleanWarehouseId, item.quantity, item.unitCost, billNumber]
           );
         }
       }
@@ -306,8 +429,24 @@ purchaseRouter.post(
     const tenantId = req.auth!.tenantId;
 
     await withTenant(tenantId, async (db) => {
-      const r = await db.query('UPDATE purchase_bills SET status = $1 WHERE id = $2 RETURNING id', [status, req.params.id]);
+      const r = await db.query('UPDATE purchase_bills SET status = $1 WHERE id = $2 RETURNING id, bill_number', [status, req.params.id]);
       if (!r.rowCount) throw notFound('Purchase bill not found');
+
+      if (status === 'cancelled') {
+        const billNum = r.rows[0].bill_number;
+        // Unpost / void linked journal entries
+        await db.query(
+          `UPDATE journal_entries
+              SET is_posted = false, reversed_at = now(), reversal_reason = 'Purchase bill cancelled'
+            WHERE (reference = $1 OR narration LIKE '%' || $1 || '%') AND is_posted = true`,
+          [billNum],
+        );
+        // Revert received inventory stock movements
+        await db.query(
+          `DELETE FROM stock_movements WHERE reference = $1 AND notes = 'Purchase Goods Receipt'`,
+          [billNum],
+        );
+      }
 
       await writeAudit(db, {
         tenantId,
@@ -323,3 +462,94 @@ purchaseRouter.post(
     res.json({ success: true, status });
   }),
 );
+
+// -------------------------------------------------------------
+// 2c. Delete Purchase Bill (owner password-protected)
+// -------------------------------------------------------------
+purchaseRouter.delete(
+  '/bills/:id',
+  requirePermission('purchase.bills.manage'),
+  asyncHandler(async (req, res) => {
+    const { isOwner, userId, tenantId } = req.auth!;
+    if (!isOwner) throw forbidden('Access denied. Only the company owner can delete purchase bills.');
+
+    const { password } = z.object({
+      password: z.string().min(1, 'Owner password is required to authorize bill deletion'),
+    }).parse(req.body);
+
+    const out = await withTenant(tenantId, async (db) => {
+      // Verify owner password
+      const userRes = await db.query('SELECT password_hash, is_owner FROM users WHERE id = $1', [userId]);
+      const user = userRes.rows[0];
+      if (!user?.is_owner) throw forbidden('Owner account required');
+
+      const ok = await verifyPassword(password, user.password_hash);
+      if (!ok) throw badRequest('Invalid owner password. Deletion authorization failed.');
+
+      // Fetch the bill
+      const billRes = await db.query(
+        `SELECT pb.id, pb.bill_number, pb.warehouse_id, pb.grand_total, pb.status
+           FROM purchase_bills pb
+          WHERE pb.id = $1`,
+        [req.params.id]
+      );
+      const bill = billRes.rows[0];
+      if (!bill) throw notFound('Purchase bill not found');
+
+      // Fetch bill items (for stock reversal)
+      const itemsRes = await db.query(
+        `SELECT item_id, quantity, unit_cost FROM purchase_bill_items WHERE bill_id = $1 AND item_id IS NOT NULL`,
+        [req.params.id]
+      );
+
+      // Reverse stock movements if the bill was received into a warehouse
+      if (bill.warehouse_id) {
+        for (const item of itemsRes.rows) {
+          await db.query(
+            `INSERT INTO stock_movements (tenant_id, item_id, warehouse_id, movement_type, quantity, unit_cost, reference, notes)
+             VALUES ($1, $2, $3, 'out', $4, $5, $6, 'Purchase Bill Deleted / Reversed')`,
+            [tenantId, item.item_id, bill.warehouse_id, item.quantity, item.unit_cost, bill.bill_number]
+          );
+        }
+      }
+
+      // Purge linked accounting journal vouchers
+      const linkedJvs = await db.query(
+        `SELECT id, entry_number FROM journal_entries WHERE reference = $1 OR narration LIKE $2`,
+        [bill.bill_number, `%${bill.bill_number}%`]
+      );
+      if (linkedJvs.rows.length > 0) {
+        const jvIds = linkedJvs.rows.map((r: any) => r.id);
+        await db.query('DELETE FROM journal_entry_lines WHERE entry_id = ANY($1)', [jvIds]);
+        await db.query('DELETE FROM journal_entries WHERE id = ANY($1)', [jvIds]);
+      }
+
+      // Delete bill items and then the bill
+      await db.query('DELETE FROM purchase_bill_items WHERE bill_id = $1', [req.params.id]);
+      await db.query('DELETE FROM purchase_bills WHERE id = $1', [req.params.id]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId,
+        action: 'purchase_bill.delete',
+        entity: 'purchase_bill',
+        entityId: req.params.id,
+        newValue: {
+          billNumber: bill.bill_number,
+          grandTotal: bill.grand_total,
+          status: bill.status,
+          deletedJvs: linkedJvs.rows.map((r: any) => r.entry_number),
+        },
+        ip: clientIp(req),
+      });
+
+      return {
+        success: true,
+        message: `Purchase bill ${bill.bill_number} deleted successfully. Stock movements have been reversed and linked accounting entries removed.`,
+      };
+    });
+
+    res.json(out);
+  }),
+);
+
