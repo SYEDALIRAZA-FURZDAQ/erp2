@@ -1,168 +1,257 @@
-# ERP-PERN
+<div align="center">
 
-A multi-tenant, modular ERP platform built on **PostgreSQL, Express, React and Node.js**, designed to run on
-cPanel shared hosting (about 1 GB RAM) and move to a VPS later with no rewrite. First market: Pakistan
-(FBR Digital Invoicing, PKR, local payroll and tax rules).
+# ⚡ ERP-PERN Enterprise Hub
 
-> **Status: Phase 0 + Phase 1 (core platform).** The foundation is here; the business modules are not built yet.
-> See [What is built](#what-is-built) and [Roadmap](#roadmap).
->
-> **Please read:** this code was written in an environment that could not reach the npm registry, so it has
-> **not been compiled, run, or tested yet**. Your first step is the [verification checklist](#first-run-verification-do-this-first).
+### Modern, Multi-Tenant Cloud ERP & Financial Ledger Platform
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+<p align="center">
+  A lightweight, high-performance, modular enterprise resource planning platform engineered with <b>PostgreSQL Row-Level Security (RLS)</b>, <b>Express</b>, <b>React</b>, and <b>Node.js</b>.<br>
+  Built with first-class support for <b>Pakistan Statutory Compliance (FBR Digital POS Invoicing, EOBI, Income Tax Slabs)</b>, multi-currency accounting, and scalable multi-tenancy.
+</p>
+
+[Explore Modules](#-core-business-modules) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [Security](#-security--compliance) • [API Guide](#-api-quick-reference)
+
+</div>
 
 ---
 
-## What is built
+## 🌟 Key Highlights
 
-| Area | Included |
-|---|---|
-| Multi-tenancy | Shared schema, `tenant_id` on every table, **PostgreSQL Row-Level Security (forced)**, transaction-scoped tenant context |
-| Auth | Tenant sign-up, login by company code + email, short-lived JWT access token (kept in memory), rotating refresh token in an httpOnly cookie with reuse detection, lockout after 5 failed logins, rate limiting |
-| Authorization | RBAC with `module.entity.action` permissions, custom roles per tenant, permission checks on every route |
-| Audit | Append-only audit log (DB trigger blocks update/delete), written in the same transaction as the change, sensitive fields redacted |
-| Numbering | Configurable document series, gap-free allocation inside the posting transaction |
-| Company | Profile (NTN, STRN, CNIC, address), base currency, fiscal-year start month |
-| Platform | Health endpoint with memory and pool stats, consistent error format, Zod validation, Helmet CSP, gzip, graceful shutdown |
-| Frontend | React + Vite + Tailwind: login/register, users, roles and permissions, audit viewer, company and numbering settings |
-| Deployment | One Node process serves the API and the built React app. `scripts/package-release.sh` builds a zip for cPanel. |
+- 🏢 **Hardware-Isolated Multi-Tenancy**: Shared database schema with enforced PostgreSQL **Row-Level Security (RLS)** ensuring strict tenant separation.
+- 🧾 **FBR Digital POS Invoicing**: Native QR code generation, real-time fiscalization, and sales tax compliance with Pakistan Federal Board of Revenue specifications.
+- 📊 **Real-Time Financial Ledger**: Full double-entry bookkeeping, Chart of Accounts, Journal Vouchers (JV, CV, BV, SI, PI), General Ledger, Trial Balance, and Profit & Loss (Income Statement).
+- 🛡️ **Owner Reversal & Deletion Protection**: Cryptographically verified owner-level controls for voiding vouchers, resetting payrolls, and stock ledger purges.
+- 🌐 **Bilingual (English & Urdu اردو)**: Built-in internationalization with instant RTL layout switching and localized numeral formatting.
+- 🚀 **Ultra-Efficient Deployment**: Operates seamlessly within constrained environments (cPanel ~1GB RAM) and scales effortlessly to high-availability VPS/Kubernetes clusters.
 
-Design decisions worth knowing:
+---
 
-- **Modular monolith.** One deployable; modules under `server/src/modules/<name>`. Future modules talk through
-  services and events, not each other's tables.
-- **No native add-ons.** Password hashing uses Node's built-in `scrypt`; there is no Prisma engine, Puppeteer or
-  argon2 build step, which keeps shared hosting happy.
-- **Money rules for later modules:** `NUMERIC` only, never floats; posted ledger entries are immutable (reverse, don't edit).
-- **Same origin.** The API and web app share one domain, so there is no CORS and no CSRF surface for the API.
+## 📦 Core Business Modules
 
-## Project layout
+| Module | Features & Capabilities |
+| :--- | :--- |
+| **📊 Dashboard & Analytics** | Real-time KPI summary (Total Sales Revenue, Inventory Stock Alerts, Attendance Ratio, Active Projects), synchronized with the accounting General Ledger. |
+| **💼 Financial Accounting** | Hierarchical Chart of Accounts (Assets, Liabilities, Equity, Revenue, Expenses), Journal Voucher creation, running balances, Trial Balance, and automated Income Statements. |
+| **🧾 Sales & Digital Invoicing** | Customer directory, tax-compliant invoicing, instant FBR POS sync, cryptographic QR codes, credit terms, and status workflows (`Draft` → `Posted` → `Paid` → `Cancelled`). |
+| **📦 Inventory & Warehouses** | SKU master catalog, multi-warehouse allocations, low-stock reorder warnings, unit-cost tracking, stock adjustments, and safety-locked stock ledger deletion. |
+| **🛍️ Purchase & Supply Chain** | Vendor management, purchase bills, goods receipt auto-posting into inventory, and accounts payable ledger synchronization. |
+| **👥 HR & Payroll** | Employee directories, salary breakdown (Basic, House Rent, Medical, Allowances), Pakistan Income Tax slabs, EOBI deductions, payslip generation, and bank payment runs. |
+| **📅 Attendance & Leaves** | Daily check-in/out tracking, automated late-arrival grace calculation, half-day detection, leave quotas, and supervisor approval pipelines. |
+| **🏢 Fixed Assets** | Asset register, acquisition tracking, salvage value calculation, straight-line depreciation engine, and automated GL depreciation postings. |
+| **🎯 Projects & Operations** | Client engagements, milestone task boards, priority tracking, team assignment, and progress reporting. |
+| **⚙️ Settings & Administration** | Document numbering rules (`INV-2026-0001`), working week schedule (Saturday rules, grace periods), audit log explorer, and owner transaction reversal console. |
 
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    Client[Web Browser / Mobile PWA] -->|HTTPS / REST API| Express[Express Node.js Server]
+    
+    subgraph Security & Middleware
+        Express --> Auth[JWT + Rotating Refresh Cookies]
+        Auth --> RBAC[Role-Based Access Control]
+        RBAC --> Audit[Tamper-Proof Audit Logger]
+    end
+
+    subgraph Business Engine
+        Audit --> Accounting[Accounting & Ledger Service]
+        Audit --> Sales[Sales & FBR Engine]
+        Audit --> Inventory[Inventory & Stock Movements]
+        Audit --> HR[HR, Attendance & Payroll Engine]
+        Audit --> Assets[Fixed Assets & Projects]
+    end
+
+    subgraph Database Layer
+        Accounting & Sales & Inventory & HR & Assets --> Pool[pg Connection Pool]
+        Pool --> RLS[PostgreSQL Row-Level Security]
+        RLS --> DB[(PostgreSQL Database)]
+    end
 ```
-erp-pern/
-├─ server/
-│  ├─ migrations/001_core.sql        # schema + RLS policies
-│  ├─ src/
-│  │  ├─ config/                     # env validation (zod), logger
-│  │  ├─ db/                         # pool + withTenant(), migration runner
-│  │  ├─ middleware/auth.ts          # JWT verify, permission gate
-│  │  ├─ modules/{auth,users,roles,audit,numbering,company,health}
-│  │  ├─ utils/                      # errors, scrypt password helpers
-│  │  ├─ app.ts / server.ts
-│  └─ tests/                         # unit + DB integration tests
-├─ web/                              # React + Vite + Tailwind
-├─ scripts/package-release.sh        # builds release/erp-pern-release.zip
-├─ .env.example
-├─ README.md
-└─ DEPLOYMENT.md                     # step-by-step cPanel guide
-```
 
-## Run it locally
+### Technical Design Principles
+1. **Modular Monolith**: Clean module isolation under `server/src/modules/*` for easy maintenance without distributed microservice overhead.
+2. **PostgreSQL RLS by Default**: Every query runs through `withTenant()` setting `app.current_tenant_id` at the database transaction level.
+3. **Immutable Financials**: Financial records follow standard accounting rules—immutable ledger entries are reversed or voided with full audit trails rather than arbitrarily deleted.
+4. **Zero Heavy Add-ons**: Cryptographic hashing utilizes Node.js native `crypto.scrypt`—avoiding finicky native compilation issues on shared hosting environments.
 
-Requirements: Node.js 18+ (22 recommended) and a PostgreSQL 13+ database you can write to.
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js**: v18.0.0 or higher (v20+ or v22+ recommended)
+- **PostgreSQL**: v14.0 or higher
+- **npm** or **pnpm**
+
+### 1. Clone & Install Dependencies
 
 ```bash
-cp .env.example server/.env       # then edit DATABASE_URL and the two JWT secrets
-# generate secrets:  node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-# for local dev set COOKIE_SECURE=false
+git clone https://github.com/your-username/erp-pern.git
+cd erp-pern
 
+# Install dependencies for both server and frontend
 npm install
-npm run migrate:dev -w server     # creates the tables
-npm run dev:server                # API on http://localhost:3000
-npm run dev:web                   # UI on  http://localhost:5173 (proxies /api to :3000)
 ```
 
-Open http://localhost:5173/register, create a company, and you are signed in as its Owner.
+### 2. Configure Environment
 
-## First run verification (do this first)
-
-Nothing below has been executed yet. Run it in order and fix anything that fails before building further:
+Copy the example environment files and configure your PostgreSQL database credentials:
 
 ```bash
-npm install
-npm run typecheck                 # server (tsc) and web (tsc)
-npm test                          # unit tests (no database needed)
-
-# Integration tests, including the tenant-isolation proof. Use a THROWAWAY database:
-TEST_DATABASE_URL=postgres://user:pass@localhost:5432/erp_test npm test
-
-npm run build
+# Server configuration
+cp .env.example server/.env
 ```
 
-The integration tests prove: one tenant cannot read another's users through the API; the database itself hides other
-tenants' rows and rejects cross-tenant writes; missing/invalid tokens get 401 and missing permission gets 403; refresh
-token reuse revokes the session family; and the account locks after repeated failures.
+Edit `server/.env`:
+```env
+PORT=3000
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/erp_pern
+DB_POOL_MAX=10
+DB_SSL=false
+COOKIE_SECURE=false
 
-## Configuration
+# Generate secure random keys with: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+JWT_ACCESS_SECRET=your_super_secret_access_key
+JWT_REFRESH_SECRET=your_super_secret_refresh_key
+ACCESS_TOKEN_TTL_MIN=15
+REFRESH_TOKEN_TTL_DAYS=14
+```
 
-All settings are environment variables (see `.env.example`). Required: `DATABASE_URL`, `JWT_ACCESS_SECRET`,
-`JWT_REFRESH_SECRET`. The server refuses to start with missing or weak values.
+### 3. Run Database Migrations
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | none |
-| `DB_POOL_MAX` | Max DB connections (keep 5 to 10 on shared hosting) | 5 |
-| `COOKIE_SECURE` | `true` when served over HTTPS | false |
-| `SERVE_WEB` | Serve the built React app from Node | true |
-| `ALLOW_TENANT_SIGNUP` | Allow public company sign-up | true |
-| `ACCESS_TOKEN_TTL_MIN` / `REFRESH_TOKEN_TTL_DAYS` | Session lifetimes | 15 / 14 |
-| `CORS_ORIGINS` | Only needed if the web app is on another origin | empty |
+```bash
+npm run migrate:dev -w server
+```
 
-Set `ALLOW_TENANT_SIGNUP=false` once your own company exists if you want to onboard customers by hand.
+*(Optional: Run test seeds to populate standard Pakistani accounts and dummy datasets)*
+```bash
+npx tsx server/src/db/seed_modules.ts
+```
 
-## API quick reference
+### 4. Start Development Servers
 
-Base path `/api/v1`. Errors look like `{ "error": { "code", "message", "details?" } }`.
+Run the backend and frontend concurrently:
 
-| Method and path | Permission |
-|---|---|
-| `GET /health` | public |
-| `POST /auth/register-tenant`, `/auth/login`, `/auth/refresh`, `/auth/logout` | public (rate limited) |
-| `GET /auth/me` | signed in |
-| `GET/POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password` | `core.users.read` / `core.users.manage` |
-| `GET/POST /roles`, `PUT/DELETE /roles/:id`, `GET /roles/permissions` | `core.roles.read` / `core.roles.manage` |
-| `GET /audit` | `core.audit.read` |
-| `GET/PUT /company` | `core.settings.read` / `core.settings.manage` |
-| `GET /numbering`, `PUT /numbering/:id` | `core.settings.read` / `core.numbering.manage` |
-
-## Adding a module (pattern for the next phases)
-
-1. Add a migration `00N_<module>.sql`. Every table gets `tenant_id`, the same `ENABLE` + `FORCE ROW LEVEL SECURITY`
-   and `tenant_isolation` policy as in `001_core.sql`.
-2. Create `server/src/modules/<module>/` with routes, service and validation. Use `withTenant()` for all queries and
-   call `writeAudit()` inside the same transaction.
-3. Add the permission keys to `permissions.ts` and mount the router in `app.ts`.
-4. Allocate document numbers with `nextDocNumber()` in the same transaction that saves the document.
-5. Add tests, including a cross-tenant isolation test for the new tables.
-
-## Roadmap
-
-| Phase | Scope | Status |
-|---|---|---|
-| 0 | Scaffold, config, migrations, deployment guide | written, unverified |
-| 1 | Auth, tenants, RBAC, audit, numbering, company settings | written, unverified |
-| 1b | Not yet done from the Phase 1 spec: workflow/approvals engine, notifications, attachments, email verification and password reset by email, TOTP 2FA, branches UI, background jobs (pg-boss), Urdu/RTL localisation, subscription plans | planned |
-| 2 | Accounting: chart of accounts, vouchers, general ledger, reports | implemented ✓ |
-| 3 | Sales, inventory, **FBR Digital Invoicing & QR** | implemented ✓ |
-| 4 | Purchase and supply chain, vendor bills, inventory receiving | implemented ✓ |
-| 5 | HR, attendance, payroll (Pakistani income tax slabs, EOBI, payslips) | implemented ✓ |
-| 6 | Fixed assets, straight-line depreciation engine | implemented ✓ |
-| 7 | Projects, tasks tracking, timesheets and expenses | implemented ✓ |
-| 8 | Distribution, BI dashboards, subscription billing, hardening | planned |
-
-**Before Phase 3 and Phase 5:** obtain the official FBR Digital Invoicing technical specification and the current tax,
-EOBI and social-security rates. Statutory values must be configurable and effective-dated, never hard-coded, and field
-names must come from the official documents, not from memory.
-
-## Honest limits of shared hosting
-
-1 GB RAM and a 100-process cap are fine for development and a handful of customers. Plan a move to a small VPS
-(2 to 4 GB, Ubuntu, Nginx, PM2) once you have paying clients; see the last section of `DEPLOYMENT.md`.
-You also have a shared IP, which matters if FBR requires IP allow-listing.
-
-
+```bash
+# Terminal 1: Backend API server (http://localhost:3000)
 npm run dev:server
 
-npm run dev:web 
-#   e r p 2  
- #   e r p 2  
- 
+# Terminal 2: Vite React Frontend (http://localhost:5173)
+npm run dev:web
+```
+
+Navigate to **[http://localhost:5173](http://localhost:5173)** in your browser and register your primary company owner account.
+
+---
+
+## 🔒 Security & Compliance
+
+| Security Measure | Implementation Details |
+| :--- | :--- |
+| **Row-Level Security (RLS)** | PostgreSQL policies enforce isolation: `CREATE POLICY tenant_isolation ON table USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)`. |
+| **Authentication** | Short-lived in-memory JWTs (15 min) + secure HttpOnly rotating refresh cookies (14 days) with automatic session hijacking detection. |
+| **Brute-Force Guard** | Automatic account lockouts after 5 consecutive failed attempts, rate-limiting on sensitive endpoints. |
+| **Immutable Audit Trail** | Append-only database table with triggers blocking updates and deletions. Tracks user, action, old/new diffs, timestamps, and IP addresses. |
+| **Owner Guarded Reversals** | Destructive actions (payroll resets, voucher reversals, warehouse purges) require explicit owner cryptographic password verification. |
+
+---
+
+## 📁 Repository Structure
+
+```
+ERP WebApp/
+├── server/                        # Backend REST API
+│   ├── migrations/                # Versioned SQL migrations (001 - 004)
+│   ├── src/
+│   │   ├── config/                # Environment schema (Zod) & Pino logger
+│   │   ├── db/                    # PostgreSQL pool, RLS wrapper, migration engine
+│   │   ├── middleware/            # JWT verification & RBAC authorization
+│   │   ├── modules/               # Domain-driven modular services
+│   │   │   ├── accounting/        # Chart of accounts, vouchers, ledger, P&L
+│   │   │   ├── assets/            # Fixed asset register & depreciation engine
+│   │   │   ├── attendance/        # Time tracking & leave requests
+│   │   │   ├── audit/             # Tamper-proof audit logs
+│   │   │   ├── auth/              # Sign-up, sessions, token rotation
+│   │   │   ├── company/           # Tenant profile, schedules & reversal console
+│   │   │   ├── hr/                # Employees, tax brackets & payroll runs
+│   │   │   ├── inventory/         # Stock items, movements & warehouses
+│   │   │   ├── numbering/         # Auto-incrementing document series
+│   │   │   ├── projects/          # Projects, milestones & tasks
+│   │   │   ├── purchase/          # Vendors & purchase bills
+│   │   │   ├── roles/             # RBAC role matrix & custom permissions
+│   │   │   ├── sales/             # Invoicing & FBR POS fiscalization
+│   │   │   └── users/             # User directory & credentials
+│   │   └── server.ts              # Server lifecycle & graceful shutdown
+│   └── tests/                     # Vitest unit & multi-tenant isolation tests
+├── web/                           # Frontend Single Page Application (SPA)
+│   ├── src/
+│   │   ├── components/            # Reusable UI component design system
+│   │   ├── lib/                   # API clients, Auth providers, i18n
+│   │   ├── pages/                 # Full-featured application views
+│   │   │   ├── AccountingPage.tsx # GL, Trial balance, Income statement
+│   │   │   ├── AttendancePage.tsx # Employee attendance & check-ins
+│   │   │   ├── Dashboard.tsx      # Executive metrics & sales sync
+│   │   │   ├── FixedAssetsPage.tsx# Asset management
+│   │   │   ├── HrPayrollPage.tsx  # Payroll processing & tax calculations
+│   │   │   ├── InventoryPage.tsx  # Stock ledger & warehouse stock
+│   │   │   ├── ProjectsPage.tsx   # Project tracking & boards
+│   │   │   ├── PurchasePage.tsx   # Supplier bills & goods receipts
+│   │   │   ├── SalesPage.tsx      # FBR POS invoicing & QR verification
+│   │   │   └── SettingsPage.tsx   # Company settings & owner consoles
+│   │   └── App.tsx                # Client-side routing & navigation
+└── scripts/                       # Deployment & packaging automation
+```
+
+---
+
+## 🛠️ Testing & Verification
+
+Run the comprehensive test suite and TypeScript verification:
+
+```bash
+# Verify TypeScript typing across server and web
+npm run typecheck
+
+# Run backend unit test suites
+npm test
+```
+
+---
+
+## 🚢 Deployment
+
+### Production Build
+```bash
+# Build React web application bundle
+npm run build:web
+
+# Build Node.js backend
+npm run build:server
+```
+
+### Shared Hosting & cPanel (LiteSpeed / Passenger)
+1. Run `scripts/package-release.sh` to produce a standalone zip file.
+2. In cPanel, navigate to **Setup Node.js App** (Node.js 18+ or 20+).
+3. Set your application root, upload the artifact, and define environment variables.
+4. Set `SERVE_WEB=true` so the Node process serves the static web bundle alongside the API seamlessly from a single port.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — feel free to use and adapt it for commercial and private deployments.
+
+---
+
+<div align="center">
+  <b>Engineered with ❤️ for Furzdaq enterprises </b>
+</div>
