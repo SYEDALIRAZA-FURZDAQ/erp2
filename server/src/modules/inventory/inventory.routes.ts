@@ -365,6 +365,67 @@ inventoryRouter.post(
 );
 
 // -------------------------------------------------------------
+// 3b. Delete Stock Movement Entry (Requires typing DELETE)
+// -------------------------------------------------------------
+inventoryRouter.delete(
+  '/movements/:id',
+  requirePermission('inventory.stock.manage'),
+  asyncHandler(async (req, res) => {
+    const tenantId = req.auth!.tenantId;
+    const movementId = req.params.id;
+
+    const { confirmation } = z
+      .object({
+        confirmation: z.literal('DELETE', {
+          errorMap: () => ({ message: 'You must type DELETE in capital letters to confirm deletion.' }),
+        }),
+      })
+      .parse(req.body);
+
+    const out = await withTenant(tenantId, async (db) => {
+      const existing = await db.query(
+        `SELECT sm.id, sm.item_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.unit_cost,
+                sm.reference, sm.notes, it.name AS "itemName", it.sku, w.name AS "warehouseName"
+           FROM stock_movements sm
+           JOIN items it ON it.id = sm.item_id
+           JOIN warehouses w ON w.id = sm.warehouse_id
+          WHERE sm.id = $1`,
+        [movementId]
+      );
+
+      if (!existing.rows[0]) throw notFound('Stock movement entry not found');
+      const mov = existing.rows[0];
+
+      await db.query('DELETE FROM stock_movements WHERE id = $1', [movementId]);
+
+      await writeAudit(db, {
+        tenantId,
+        userId: req.auth!.userId,
+        action: 'stock.movement.delete',
+        entity: 'stock_movement',
+        entityId: movementId,
+        newValue: {
+          sku: mov.sku,
+          itemName: mov.itemName,
+          warehouseName: mov.warehouseName,
+          movementType: mov.movement_type,
+          quantity: mov.quantity,
+          reference: mov.reference,
+        },
+        ip: clientIp(req),
+      });
+
+      return {
+        success: true,
+        message: `Stock movement entry (${mov.movement_type.toUpperCase()} ${mov.quantity} for ${mov.sku} - ${mov.itemName}) has been permanently deleted.`,
+      };
+    });
+
+    res.json(out);
+  }),
+);
+
+// -------------------------------------------------------------
 // 2b. Delete Warehouse (owner password-protected)
 // -------------------------------------------------------------
 inventoryRouter.delete(

@@ -68,6 +68,11 @@ export default function InventoryPage() {
   const [deleteWhPassword, setDeleteWhPassword] = useState('');
   const [deleteWhLoading, setDeleteWhLoading] = useState(false);
 
+  // Delete Stock Movement State (requires typing DELETE)
+  const [deletingMovement, setDeletingMovement] = useState<StockMovement | null>(null);
+  const [deleteMovementConfirm, setDeleteMovementConfirm] = useState('');
+  const [deleteMovementLoading, setDeleteMovementLoading] = useState(false);
+
   // Edit Item Form
   const [editForm, setEditForm] = useState({
     sku: '',
@@ -264,6 +269,27 @@ export default function InventoryPage() {
     }
   };
 
+  const handleDeleteMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingMovement || deleteMovementConfirm !== 'DELETE') return;
+    try {
+      setDeleteMovementLoading(true);
+      setError(null);
+      const res = await del<{ success: boolean; message: string }>(`/inventory/movements/${deletingMovement.id}`, {
+        confirmation: 'DELETE',
+      });
+      setSuccess(res.message);
+      setDeletingMovement(null);
+      setDeleteMovementConfirm('');
+      loadData();
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete stock movement');
+    } finally {
+      setDeleteMovementLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -442,6 +468,7 @@ export default function InventoryPage() {
                 <th className="th text-right">{t('inventory.quantity', 'Quantity')}</th>
                 <th className="th text-right">{t('inventory.unit_cost', 'Unit Cost')}</th>
                 <th className="th">{t('inventory.reference_note', 'Reference')}</th>
+                <th className="th text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -472,11 +499,28 @@ export default function InventoryPage() {
                     PKR {Number(m.unitCost).toLocaleString()}
                   </td>
                   <td className="td text-slate-500">{m.reference || '—'}</td>
+                  <td className="td text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Delete stock movement entry"
+                      onClick={() => {
+                        setDeletingMovement(m);
+                        setDeleteMovementConfirm('');
+                        setError(null);
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
               {movements.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={8} className="p-8 text-center text-slate-500">
                     {t('common.no_records', 'No stock movements recorded yet.')}
                   </td>
                 </tr>
@@ -990,6 +1034,111 @@ export default function InventoryPage() {
                 disabled={deleteWhLoading}
               >
                 {deleteWhLoading ? 'Verifying & Deleting…' : '🗑️ Confirm Delete Warehouse'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {/* MODAL: Delete Stock Movement Entry (Requires typing DELETE) */}
+      {deletingMovement && (
+        <Modal
+          title={`Delete Stock Movement: ${deletingMovement.sku}`}
+          onClose={() => {
+            if (!deleteMovementLoading) {
+              setDeletingMovement(null);
+              setDeleteMovementConfirm('');
+            }
+          }}
+        >
+          <form onSubmit={handleDeleteMovement} className="space-y-4 text-xs">
+            {/* Danger warning */}
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-rose-800 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-rose-900">
+                ⚠️ Permanent Ledger Entry Deletion Warning
+              </p>
+              <p>
+                Deleting this stock movement entry will permanently purge it from the stock movements ledger
+                and recalculate the in-stock level for <strong>{deletingMovement.itemName}</strong> ({deletingMovement.sku}) in <strong>{deletingMovement.warehouseName}</strong>.
+              </p>
+            </div>
+
+            {/* Movement details summary */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-slate-500">Date:</span>
+                  <p className="font-medium text-slate-800">{deletingMovement.createdAt.slice(0, 10)}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Warehouse:</span>
+                  <p className="font-medium text-slate-800">{deletingMovement.warehouseName}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2">
+                <div>
+                  <span className="text-slate-500">Product / Item:</span>
+                  <p className="font-semibold text-slate-900">{deletingMovement.sku} - {deletingMovement.itemName}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Type & Quantity:</span>
+                  <p className="font-mono font-bold text-slate-900">
+                    <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold ${
+                      deletingMovement.movementType === 'in' ? 'bg-emerald-100 text-emerald-800' :
+                      deletingMovement.movementType === 'out' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {deletingMovement.movementType}
+                    </span>
+                    {Number(deletingMovement.quantity) > 0 ? `+${deletingMovement.quantity}` : deletingMovement.quantity} {deletingMovement.uom}
+                  </p>
+                </div>
+              </div>
+              {deletingMovement.reference && (
+                <div className="border-t border-slate-200/60 pt-2">
+                  <span className="text-slate-500">Reference / Notes:</span>
+                  <p className="text-slate-700 italic">{deletingMovement.reference}</p>
+                </div>
+              )}
+            </div>
+
+            {/* BOLD Letters DELETE confirmation input */}
+            <div>
+              <label className="label text-xs font-semibold text-slate-800">
+                To confirm deletion, type <span className="font-extrabold text-rose-600 uppercase tracking-widest text-sm bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">DELETE</span> in bold capital letters *
+              </label>
+              <input
+                id="delete-movement-confirm-input"
+                type="text"
+                required
+                className="input font-mono font-bold tracking-widest uppercase border-rose-300 focus:border-rose-500 focus:ring-rose-500 placeholder:normal-case placeholder:font-normal placeholder:tracking-normal"
+                placeholder="Type DELETE in bold capital letters..."
+                value={deleteMovementConfirm}
+                onChange={(e) => setDeleteMovementConfirm(e.target.value)}
+                autoFocus
+                autoComplete="off"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                You must type <strong className="font-bold text-slate-700">DELETE</strong> exactly as shown above to authorize this action.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={deleteMovementLoading}
+                onClick={() => {
+                  setDeletingMovement(null);
+                  setDeleteMovementConfirm('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs py-2 px-4 shadow-sm font-semibold"
+                disabled={deleteMovementLoading || deleteMovementConfirm !== 'DELETE'}
+              >
+                {deleteMovementLoading ? 'Deleting…' : '🗑️ Confirm Delete Entry'}
               </button>
             </div>
           </form>
