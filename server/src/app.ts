@@ -80,6 +80,15 @@ export function createApp() {
     app.use('/assets', express.static(path.join(webDist, 'assets'), { immutable: true, maxAge: '1y' }));
     app.use(express.static(webDist, { maxAge: '1h' }));
     app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+  } else {
+    app.get('/', (_req, res) => {
+      res.json({
+        name: 'ERP-PERN Backend API',
+        status: 'online',
+        health: '/api/v1/health',
+        message: 'Backend API is running. Access the web interface from your Vercel deployment URL.',
+      });
+    });
   }
 
   app.use(errorHandler);

@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: erp-pern-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build:server
+    startCommand: npm run migrate -w server && npm run start -w server
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_POOL_MAX
+        value: "4"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SERVE_WEB
+        value: "false"
+      - key: ALLOW_TENANT_SIGNUP
+        value: "true"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL_MIN
+        value: "15"
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: "14"
+      - key: CORS_ORIGINS
+        sync: false
